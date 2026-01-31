@@ -102,7 +102,7 @@ class Household:
         such that the lifetime budget constraint holds (b_{last} = 0) AND
         savings are non-negative throughout (no borrowing).
 
-        Strategy:
+        Strategy: 
         1. Try Brent's method for root finding (faster when feasible)
         2. Check if solution satisfies borrowing constraint
         3. If not, use minimization with borrowing penalty
