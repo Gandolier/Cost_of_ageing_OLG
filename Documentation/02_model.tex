@@ -1,0 +1,341 @@
+\section{The model}
+\label{sec:model}
+
+The model used is an \ac{OLG} model, with individuals living for at maximum $S$ periods, dynamic demography, with perfect expectations, endogenous labour supply and the public tax sector. It is based on a model from \textcolor{Fuchsia}{\cite{evans2017}}. 
+
+\subsection{Demography}
+\label{subsec:demography}
+
+Some number $\omega_{s,t}$ of households of age $s$ are alive at period $t$. A measure $\omega_{1,t}$ of individuals is born each period, they are unemployed and not market-active until age $E$ due to being too young. After age $E$ they join the broad economic activity and they live for up to $S$ years. 
+
+The population movement is modelled following a popular approach in demographic literature \textcolor{Fuchsia}{\cite{raftery2023}}, 
+\begin{equation} \label{eq:demography}
+    \begin{aligned}
+        \omega_{1, t+1} &= (1 - \rho_{0,t}) \sum_{s=1}^{S} f_s \omega_{s,t} + i_1 I_t; \quad \forall t \\
+        \
+        \omega_{s+1, t+1} &= (1 - \rho_{s,t}) \omega_{s,t} + i_{s+1} I_t; \quad \forall t, \quad 1 \leq s \leq S-1
+    \end{aligned}
+\end{equation}
+
+\noindent where $\omega_{s,t}$ is population of age $s$ at period $t$, $\rho_{s,t}$ is a probability of death of age $s$ individual at period $t$ and $f_s$ is an age-specific fertility rate. Net migration consists of migration rate of age $s$ individuals and of total net-migration $I_t$ at period $t$.
+
+Such demography system setup allows to take forecasts of $\omega_{s,t}, \rho_{s,t}$ and $I_t$ from advanced forecasting models, like a Bayesian probabilistic projections \textcolor{Fuchsia}{\cite{raftery2012}}, while maintaining the structural integrity of the OLG model built on top of this demography system.
+
+We also define the total population $N_t$ at time $t$ and the growth rate of the population $g_{n,t}$ at time $t$ \textcolor{Fuchsia}{\eqref{eq:aggr_dem}},
+\begin{equation} \label{eq:aggr_dem}
+    \begin{aligned}
+        N_t = \sum^S_{s=1}\omega_{s,t}
+        \\
+        g_{n,t+1} = \frac{N_{t+1}}{N_t} -1
+    \end{aligned}
+\end{equation}
+
+And additionally we define $\tilde{N_t} = \sum^S_{s=E+1}\omega_{s,t}$ and
+$\tilde{g}_{n,t+1} = \tilde{N}_{t+1}/\tilde{N}_t -1$, which are the total working population and the working population growth rates respectively.
+
+\subsection{Households}
+\label{subsec:households}
+Some number $\omega_{1, t}$ of identical individuals are born each period $t$ and they live for at most $S$ years, where $s$ is their age. After reaching a working age $E$ an individual becomes economically active, and in each period is endowed with a unit measure of time $\tilde{l}$ which he can spend either on labour or on leisure.
+
+Each period of their lives individuals choose their sets of consumption \\ $\{c_{s,t+s-E-1}\}^S_{s=E+1}$, labour $\{n_{s,t+s-E-1}\}^S_{s=E+1}$ and savings $\{b_{s+1,t+s-E}\}^{S-1}_{s=E+1}$ so as to maximize a lifetime-utility function,
+\begin{equation}\label{eq:maximization_problem}
+    \max_{\substack{
+      \{c_{s,t+s-E-1}, n_{s,t+s-E-1}\}_{s=E+1}^S; \\
+      \{b_{s+1,t+s-E}\}_{s=E+1}^{S-1}
+      }}
+    \sum^S_{s=E+1} \beta^{s-1} \left[ {\scriptstyle\prod}^{s-1}_{u=E} (1-\rho_{u, t+s-E-1})\right] u(c_{s, t+s-E-1}, n_{s, t+s-E-1})
+\end{equation}
+
+\noindent where $\beta$ is a subjective discounting factor. Agents account for their mortality probability when choosing consumption for their future selves, thus the probability of survival term $(1-\rho_{u, t+s-E-1})$ is included in the product to represent a cumulative probability of survival.
+The above equation is a composition of instantaneous utility functions,
+\begin{equation}\label{eq:utility_function}
+    u(c_{s,t}, n_{s,t})=\frac{(c_{s,t})^{1-\sigma}}{1-\sigma}+e^{tg_y(1-\sigma)} b \left[ 1 - \left(\frac{n_{s,t}}{\tilde{l}}\right)^\upsilon \right]^{\frac{1}{\upsilon}}; \quad \forall \ t;\ s>E
+\end{equation}
+
+\noindent where $\sigma$ is a relative risk aversion factor, parameters $b$ and $\upsilon$ are from elliptical dis-utility of labour function, and $e^{tg_y(1-\sigma)}$ is added to the function for the purposes of stationarization, more on which in subsection \textcolor{Fuchsia}{\ref{subsec:stat}}.
+
+Each period individual maximize their utility \textcolor{Fuchsia}{\eqref{eq:utility_function}} while being subject to a budget constraint:
+\begin{equation}\label{eq:budget_constraint}
+    \begin{aligned}
+        c_{s,t}+b_{s+1, t+1} = (1-\tau^l_{s,t})w_t n_{s,t} + (1+r_t(1-\tau^k_{s,t}))b_{s,t} + X_{s,t} + \frac{BQ_t}{\tilde{N_t}}
+        \\
+        BQ_t = (1+r_t) \sum^S_{s=E+2}\rho_{s-1, t-1}\omega_{s-1,t-1}b_{s,t}; \quad b_{E+1, t} = b_{E+S+1, t} = 0
+    \end{aligned}
+\end{equation}
+
+\noindent where $b_{s+1, t+1}$ are the savings of $s$-th individual in period $t$ which will return to him in the next period with an interest rate of $r_t$; $b_{s, t}$ are the savings with which individual $s$ enters the period $t$. Current wages are $w_t$ and are equal for all individuals. Taxes $\tau^l_{s,t}$ and $\tau^k_{s,t}$ are collected, in the same period all the collected money are paid out to pensioners via the transfer component $X_{s,t}$.
+
+Accidental bequests $BQ_t$ are left from the households who passed away at period $t-1$ and the division by $\tilde{N_t}$ represents the fact that bequests are evenly distributed between the cohorts at period $t$. Agent don't have any savings from the previous period when they just entered the workforce $b_{E+1, t}=0$, they also do not save in the last possible period of their lives since they are aware of their inevitable death next period $b_{E+S+1, t} = 0$.
+
+
+\subsection{Firms}
+\label{subsec:firms}
+
+There are a certain number of identical, completely competitive firms in the economy, they lease investment capital $K_t$ from individuals at a real interest rate $r_t$ and employ labour $L_t$ for real wages $w_t$. Firms use their capital $K_t$ and labour $L_t$ to produce $Y_t$ products in each period according to the Cobb–Douglas production function with exogenous technological progress $g_y$,
+\begin{equation}\label{eq:production_function}
+    Y_t=AK_t^{\alpha}(e^{g_y t}L_t)^{1-\alpha} \quad \forall t, \quad \alpha \in (0, 1), \quad A>0
+\end{equation}
+where $\alpha$ is a capital share in output and $A$ is a factor productivity. The rate of exogenous technological progress is assumed to be impacting the output exponentially. It is also assumed that a price of a unit measure of output $Y_t$ is set $P_t = 1, \ \forall t$.
+
+Each period companies choose $K_t$ and $L_t$ in order to maximize their profits given by,
+\begin{equation}\label{eq:profit_maximization}
+    \max \pi = \max_{K_t, L_t} \left[ (1-\tau^c_t)\left( AK_t^{\alpha}(e^{g_y t}L_t)^{1-\alpha} -w_tL_t -\delta K_t \right) -r_tK_t \right]
+\end{equation}
+where $\delta \in [0, 1]$ - a capital depreciation factor and $\tau^c_t$ is a tax rate on book profits, therefore, labour costs and depreciation charges are deductible, but capital interest payments aren't.
+
+From maximization problem in \textcolor{Fuchsia}{\eqref{eq:profit_maximization}} we derive the following two equations,
+
+\begin{equation}\label{eq:wage_function}
+    w_t=(1-\alpha) \left[ \frac{Y_t}{L_t} \right]
+\end{equation}
+\begin{equation}\label{eq:key_rate_function}
+    r_t=(1-\tau_t^c) \left[ \alpha \frac{Y_t}{K_t} - \delta \right]
+\end{equation}
+
+Plugging \textcolor{Fuchsia}{\eqref{eq:production_function}} in both \textcolor{Fuchsia}{\eqref{eq:wage_function}} and \textcolor{Fuchsia}{\eqref{eq:key_rate_function}} and then plugging \textcolor{Fuchsia}{\eqref{eq:key_rate_function}} into \textcolor{Fuchsia}{\eqref{eq:wage_function}} yields,
+
+\begin{equation}\label{eq:combined_wage_function}
+    w_t=A(1-\alpha) \left[ \frac{1}{A\alpha} \left( \frac{r_t}{1-\tau^c_t} +\delta \right) \right]^{\frac{\alpha}{\alpha-1}}
+\end{equation}
+
+
+
+\subsection{Market clearing}
+\label{subsec:clearing}
+
+In this model, an equilibrium of supply and demand is established in the labour, capital, and commodity markets:
+\begin{equation}\label{eq:aggregate_labour}
+    L_t = \sum_{s=E+1}^{S} \omega_{s,t} n_{s,t}
+\end{equation}
+
+\begin{equation}\label{eq:aggregate_capital}
+    K_t = \sum_{s=E+2}^{S} \left( \omega_{s-1,t-1} b_{s,t} + i_s I_{t-1} b_{s,t} \right)
+\end{equation}
+
+\begin{equation}\label{eq:clearing_prod_function}
+    \begin{aligned}
+      Y_t = C_t + Inv_t - \sum_{s=E+2}^{S} i_s I_t b_{s,t+1}
+      \\
+      \text{where} \quad Inv_t \equiv K_{t+1} - (1 - \delta) K_t
+      \\
+      \text{and} \quad C_t \equiv \sum_{s=E+1}^{S} \omega_{s,t} c_{s,t}
+    \end{aligned}
+\end{equation}
+
+Bequests of the households who passed away in the previous period $t-1$ are formed in this period,
+\begin{equation}\label{eq:bequests_function}
+    BQ_t = (1+r_t) \sum^S_{s=E+2}\rho_{s-1, t-1}\omega_{s-1,t-1}b_{s,t}, \quad \forall t
+\end{equation}
+
+And also pensions $X_{s,t}$ are formed and evenly paid to all retirees,
+\begin{equation}\label{eq:pension_payment_function}
+    X_{s,t} = \frac{1}{N_{R, t}} \left[ \left( \sum^S_{s=E+1}  \omega_{s,t} (\tau^l_{s,t} w_t n_{s,t} + \tau^k_{s,t} r_t b_{s,t}) \right) + \tau^c_t(Y_t - w_t L_t - \delta K_t) \right]
+\end{equation}
+where $N_{R,t} = \sum^S_{s=R+1}\omega_{s,t}$ is the total number of retirees. For pensioners the pension payment is as in \textcolor{Fuchsia}{\eqref{eq:pension_payment_function}}, for everybody else it is obviously $0$.
+
+Since the transition period state pensions are assumed to be fixed we need variable taxes to fulfil the necessary budget income at each period, thus we have,
+\begin{equation}\label{eq:tax_rates_functions}
+    \begin{aligned}
+        \tau^l_{s,t}=\frac{X_t N_{R,t}}{\sum^S_{s=E+1}\omega_{s,t} w_t n_{s,t}}; \\
+        \tau^k_{s,t} = \frac{X_t N_{R,t}}{\sum^S_{s=E+1}\omega_{s,t} r_t b_{s,t}}; \\
+        \tau^c_{t} = \frac{X_t N_{R,t}}{Y_t - w_t L_t - \delta K_t}
+    \end{aligned}
+\end{equation}
+
+
+
+\subsection{Stationarity}
+\label{subsec:stat}
+
+In current model setup no steady state equilibrium is possible since most of the variable are growing (i.e. having a trend component) at either the labour augmenting technological change $g_y$ from \textcolor{Fuchsia}{\eqref{eq:production_function}} or at the population growth rate $g_{n,t}$ from \textcolor{Fuchsia}{\eqref{eq:aggr_dem}}.
+
+The table \textcolor{Fuchsia}{\ref{tab:stationary_defs}} shows the sources of growth of variables in the model and their respective stationary versions. It is important to notice that $r_t$ in \textcolor{Fuchsia}{\eqref{eq:key_rate_function}} is already stationary since $Y_t$ grows at the same rate as $K_t$. The individual labour supply $n_{s,t}$ is also stationary because of the $e^{tg_y(1-\sigma)}$ term in \textcolor{Fuchsia}{\eqref{eq:utility_function}}, this is demonstrated later this section.
+
+\begin{table}[H]
+  \centering
+  \caption{Stationary variable definitions}
+  \label{tab:stationary_defs}
+  \renewcommand{\arraystretch}{1.0}
+  \begin{tabular}{@{} l l l @{}}
+    \specialrule{0.3pt}{0pt}{2pt}
+    \specialrule{0.3pt}{0pt}{2pt}
+    \multicolumn{3}{c}{\textbf{Sources of growth}} \\[3pt]
+    %\cmidrule(r){1-3}
+    \quad {$\mathbf{e^{g_y t}}$}
+      &\quad $\mathbf{\tilde N_t}$
+      &\quad $\mathbf{e^{g_y t}\,\tilde N_t}$ \\
+    \midrule
+    $\displaystyle \hat c_{s,t}\equiv\frac{c_{s,t}}{e^{g_y t}}$
+      & $\displaystyle \hat\omega_{s,t}\equiv\frac{\omega_{s,t}}{\tilde N_t}$
+      & $\displaystyle \hat Y_t\equiv\frac{Y_t}{e^{g_y t}\,\tilde N_t}$ \\[10pt]
+    $\displaystyle \hat b_{s,t}\equiv\frac{b_{s,t}}{e^{g_y t}}$
+      & $\displaystyle \hat L_t\equiv\frac{L_t}{\tilde N_t}$
+      & $\displaystyle \hat K_t\equiv\frac{K_t}{e^{g_y t}\,\tilde N_t}$ \\[10pt]
+    $\displaystyle \hat w_t\equiv\frac{w_t}{e^{g_y t}}$
+      & $\displaystyle \hat I_t \equiv \frac{I_t}{\tilde N_t}$
+      & $\displaystyle \hat C_t\equiv\frac{C_t}{e^{g_y t}\,\tilde N_t}$ \\[10pt]
+      $\displaystyle \hat X_{s,t}\equiv\frac{X_{s,t}}{e^{g_y t}}$
+      & $\displaystyle \hat N_{R,t} \equiv \frac{N_{R,t}}{\tilde N_t}$
+      & $\displaystyle \hat{BQ}_t\equiv\frac{BQ_t}{e^{g_y t}\,\tilde N_t}$ \\
+    \specialrule{0.3pt}{2pt}{2pt}
+    \specialrule{0.3pt}{0pt}{0pt}
+  \end{tabular}
+\end{table}
+
+We now prove the stationarity of variables in table \textcolor{Fuchsia}{\ref{tab:stationary_defs}}.
+
+First, aggregate labour \textcolor{Fuchsia}{\eqref{eq:aggregate_labour}} is a function of population $\omega_{s,t}$ , which is growing at the population growth rate, and stationary labour supply $n_{s,t}$. We can stationarize the aggregate labour market clearing condition
+by dividing both sides of \textcolor{Fuchsia}{\eqref{eq:aggregate_labour}} by the total economically relevant population $\tilde{N}_t$ in period $t$.
+
+\begin{equation}\label{eq:aggregate_labour_stat}
+    \hat{L}_t = \sum_{s=E+1}^{S} \hat{\omega}_{s,t} n_{s,t}
+\end{equation}
+
+The aggregate capital clearing condition \textcolor{Fuchsia}{\eqref{eq:aggregate_capital}} and the total bequests equation \textcolor{Fuchsia}{\eqref{eq:bequests_function}} can be stationaryzed by dividing by $e^{g_y t}\tilde{N}_t$.
+
+\begin{equation}\label{eq:aggregate_capital_stat}
+    \hat{K}_t = \frac{1}{1+\tilde{g}_{n,t}} \sum_{s=E+2}^{S} \left( \hat{\omega}_{s-1,t-1} \hat{b}_{s,t} + i_s \hat{I}_{t-1} \hat{b}_{s,t} \right)
+\end{equation}
+\begin{equation}\label{eq:bequests_stat}
+    \hat{BQ}_t = \left( \frac{1+r_t}{1+\tilde{g}_{n,t}} \right) \sum^S_{s=E+2}\rho_{s-1, t-1}\hat{\omega}_{s-1,t-1}\hat{b}_{s,t}, \quad \forall t
+\end{equation}
+
+The goods market clearing condition is rather intricate, thus it is important to configure its stationary version correctly since in the process of computing the equilibrium it will serve as an important sanity check.
+
+\begin{equation}\label{eq:clearing_output_stat}
+    \begin{aligned}
+      \hat{Y}_t = \hat{C}_t + \hat{Inv}_t - e^{g_y} \sum_{s=E+2}^{S} i_s \hat{I}_t \hat{b}_{s,t+1}
+      \\
+      \text{where} \quad \hat{Inv}_t \equiv e^{g_y}(1+\tilde{g}_{n,t+1})\hat{K}_{t+1} - (1 - \delta) \hat{K}_t
+      \\
+      \text{and} \quad \hat{C}_t \equiv \sum_{s=E+1}^{S} \hat{\omega}_{s,t} \hat{c}_{s,t}
+    \end{aligned}
+\end{equation}
+
+To stationarize the aggregate output function \textcolor{Fuchsia}{\eqref{eq:production_function}} we divide by $e^{g_y t}\tilde{N}_t$,
+\begin{equation}\label{eq:production_stat}
+    \hat{Y}_t=A\hat{K}_t^{\alpha}\hat{L}_t^{1-\alpha} \quad \forall t, \quad \alpha \in (0, 1), \quad A>0
+\end{equation}
+
+It is important to define $r_t$ here in terms of distribution of labour force and distribution of capital, so following \textcolor{Fuchsia}{\eqref{eq:key_rate_function}} we have,
+
+\begin{equation}\label{eq:key_rate_explicit}
+    r_t = (1-\hat{\tau}^c_t)\left( \alpha A \left[
+    \frac{
+        \textstyle \sum_{s=E+1}^{S} \hat{\omega}_{s,t} n_s
+    }{
+        \textstyle (1+\tilde{g}_{n,t})^{-1} \sum_{s=E+2}^{S} \left( \hat{\omega}_{s-1,t-1} \hat{b}_{s,t} + i_s \hat{I}_{t-1} \hat{b}_{s,t} \right)
+    }
+\right]^{1-\alpha} - \delta \right)
+\end{equation}
+
+Equilibrium stationary wage is just,
+
+\begin{equation}\label{eq:wage_stat}
+    \hat{w}_t=(1-\alpha) \left[ \frac{\hat{Y}_t}{\hat{L}_t} \right] = A(1-\alpha) \left[ \frac{1}{A\alpha} \left( \frac{r_t}{1-\hat{\tau}^c_t} +\delta \right) \right]^{\frac{\alpha}{\alpha-1}}
+\end{equation}
+
+Since pensions are easily stationarized $\hat{X}_{s,t}\equiv\frac{X_{s,t}}{e^{g_y t}}$ we have the following stationary functions for various tax rates,
+
+\begin{equation}\label{eq:tax_rates_stat}
+    \begin{aligned}
+        \hat{\tau}^l_{s,t}=\frac{\hat{X}_t \hat{N}_{R,t}}{\sum^R_{s=E+1}\hat{\omega}_{s,t} \hat{w}_t n_{s,t}};
+        \\
+        \hat{\tau}^k_{s,t} = \frac{\hat{X}_t \hat{N}_{R,t}}{\sum^R_{s=E+1}\hat{\omega}_{s,t} r_t \hat{b}_{s,t}};
+        \\
+        \hat{\tau}^c_{s,t} = \frac{\hat{X}_t \hat{N}_{R,t}}{\hat{Y} - \hat{w}_t \hat{L}_t - \delta \hat{K}_t}
+    \end{aligned}
+\end{equation}
+
+Finally, the budget constraint \textcolor{Fuchsia}{\eqref{eq:budget_constraint}} is stationarized in the following way,
+
+\begin{equation}\label{eq:budget_constraint_stat}
+    \hat{c}_{s,t} = (1-\hat{\tau}^l_{s,t})\hat{w}_t n_{s,t} + (1+r_t(1-\hat{\tau}^k_{s,t}))\hat{b}_{s,t} + \hat{X}_{s,t} + \hat{BQ}_t - e^{g_y}\hat{b}_{s+1, t+1}
+\end{equation}
+
+
+\subsection{Equilibrium}
+\label{subsec:equilibrium}
+
+To find equilibrium we must solve the maximization problem of \textcolor{Fuchsia}{\eqref{eq:maximization_problem}} with substitution of utility function \textcolor{Fuchsia}{\eqref{eq:utility_function}} and budget constraint \textcolor{Fuchsia}{\eqref{eq:budget_constraint_stat}}. The resulting $2(S-E)-1$ equations for each period are the inter-temporal Euler equations characterising the equilibrium,
+
+\begin{equation}\label{eq:euler_equations}
+    \begin{gathered}
+        \frac{\partial u(\{\hat{n}_{s,t+s-E-1}\}^S_{s=E+1};\{\hat{b}_{s+1,t+s-E}\}^{S-1}_{s=E+1})}{\partial \hat{b}_{s+1,t+1}} = 0, s \in \{ E+1, E+2, ..., S-1\}
+        \\
+        \Rightarrow (\hat{c}_{s,t})^{-\sigma} = e^{-\sigma g_y} \beta (1-\rho_{s,t}) (1+r_{t+1}(1-\hat{\tau}^k_{s,t+1}))(\hat{c}_{s+1,t+1})^{-\sigma}
+    \end{gathered}
+\end{equation}
+where $\hat{c}_{s,t}$ is from the budget constraint \textcolor{Fuchsia}{\eqref{eq:budget_constraint_stat}}.
+
+\begin{equation}\notag
+    \begin{gathered}
+        \frac{\partial u(\{n_{s,t+s-E-1}\}^S_{s=E+1};\{b_{s+1,t+s-E}\}^{S-1}_{s=E+1})}{\partial n_{s,t}} = 0, s \in \{E+1, E+2, ..., S\}
+        \\
+        \Rightarrow w_t(1-\hat{\tau}^l_{s,t})(c_{s,t})^{-\sigma}= e^{g_y t (1-\sigma)} \left( \frac{b}{\tilde{l}} \right) \left( \frac{n_{s,t}}{\tilde{l}} \right)^{\upsilon - 1} \left[ 1- \left( \frac{n_{s,t}}{\tilde{l}} \right)^{\upsilon} \right]^{\frac{1-\upsilon}{\upsilon}} \bigg| \times e^{-g_y t (1-\sigma)}
+    \end{gathered}
+\end{equation}
+\begin{equation}\label{eq:euler_solution}
+    \Rightarrow \hat{w}_t(1-\hat{\tau}^l_{s,t})(\hat{c}_{s,t})^{-\sigma} = \left( \frac{b}{\tilde{l}} \right) \left( \frac{n_{s,t}}{\tilde{l}} \right)^{\upsilon - 1} \left[ 1- \left( \frac{n_{s,t}}{\tilde{l}} \right)^{\upsilon} \right]^{\frac{1-\upsilon}{\upsilon}}
+\end{equation}
+
+The equation \textcolor{Fuchsia}{\eqref{eq:euler_solution}} can be further simplified,
+\begin{equation}\notag
+    \begin{gathered}
+        \hat{w}_t(1-\hat{\tau}^l_{s,t})(\hat{c}_{s,t})^{-\sigma} = \left( \frac{b}{\tilde{l}} \right) \left( \frac{n_{s,t}}{\tilde{l}} \right)^{\upsilon - 1} \left[ 1- \left( \frac{n_{s,t}}{\tilde{l}} \right)^{\upsilon} \right]^{\frac{1-\upsilon}{\upsilon}}
+        \\
+        \Rightarrow \hat{w}_t(1-\hat{\tau}^l_{s,t})(\hat{c}_{s,t})^{-\sigma} = \left( \frac{b}{\tilde{l}} \right) \left( \frac{n_{s,t}}{\tilde{l}} \right)^{\upsilon - 1} \left( \frac{n_{s,t}}{\tilde{l}} \right)^{1 - \upsilon} \left[ \left( \frac{n_{s,t}}{\tilde{l}} \right)^{-\upsilon} - 1 \right]^{\frac{1-\upsilon}{\upsilon}}
+        \\
+        \Rightarrow \hat{w}_t(1-\hat{\tau}^l_{s,t})(\hat{c}_{s,t})^{-\sigma} =  \left( \frac{b}{\tilde{l}} \right) \left[ \left( \frac{n_{s,t}}{\tilde{l}} \right)^{-\upsilon} - 1 \right]^{\frac{1-\upsilon}{\upsilon}}
+    \end{gathered}
+\end{equation}
+
+And thus we get,
+
+\begin{equation}\label{eq:labour_function_explicit}
+    n_{s,t} = \tilde{l} \left[ 1 + \left( \frac{b(\hat{c}_{s,t})^{\sigma}}{\tilde{l}\hat{w}_t (1-\hat{\tau}^l_{s,t})} \right)^{\frac{\upsilon}{\upsilon - 1}} \right]^{-\frac{1}{\upsilon}}
+\end{equation}
+
+Now we can define the algorithm of numerically finding the steady state of the system. For the algorithm we need at minimum two guesses of variables values for the outer loop, which will allow us to solve for the steady state values of the entire system. The choice of two variable for which we will make a guess is $r_t$ and specific $\tau_{s,t}$ since it is much easier to make an initial guess for those fraction variables as they all are $\in (0, 1)$.
+
+It is important to explain what is a \textit{specific} $\tau_{s,t}$. For the purposes of this research the three possible transition scenarios are created, they differ only in the way they deal with the fiscal tax burden due to pension payments. They correspond to financing the budget gap by three different taxes, all of which use just one tax rate. Depending on the scenario and a specific tax financing the transition we choose a tax rate variable for the outer loop solution.
+
+In what follows, steady state values of variables are indicated by a bar sign.
+\begin{algorithm}[H]
+\caption{Steady State solution algorithm}
+\label{algo:steady_state_solution}
+\begin{algorithmic}
+    \Require make a guess for $\bar{r}$, a specific $\bar{\tau}$ and $\bar{BQ}$
+    \Repeat
+
+    \State $\bar{w} \gets \{\bar{r}, \bar{\tau^c}, A, \alpha, \delta \}$ according to \textcolor{Fuchsia}{\eqref{eq:wage_stat}} \\
+
+    \hrulefill\\
+        \Comment{A rootfinding algorithm}
+        \State Make a guess for $\bar{c}_{E+1}$
+        \State $\{ \bar{c_s} \}^S_{s=E+1} \gets \{ \bar{c_1}, \bar{r}, \bar{\tau}^k_s, \rho_s, \beta, \sigma, g_y \}$ according to \textcolor{Fuchsia}{\eqref{eq:euler_equations}}
+
+        \State $\{ \bar{n_s} \}^S_{s=E+1} \gets \{ \bar{w}, \bar{c_s}, \bar{\tau}^l_s, \tilde{l}, \sigma, \upsilon, b \}$ according to \textcolor{Fuchsia}{\eqref{eq:labour_function_explicit}}
+
+        \State $\{ \bar{b_s} \}^S_{s=E+2} \gets \{ \bar{c_s}, \bar{w}, \bar{n_s}, \bar{\tau}^l_s, \bar{r}, \bar{\tau}^k_s, \bar{X_s}, \bar{BQ}, g_y \}$ according to \textcolor{Fuchsia}{\eqref{eq:budget_constraint_stat}}, $\bar{b}_{s=E} = 0$
+
+        \State Rootfinder optimizes initial $\bar{c}_{E+1}$ guess so as to satisfy $b_{s=S+1}=0$ -- in the last
+        \State period of agent live savings are zero since he is aware of his inevitable death
+        \State next year.\\
+    \hrulefill\\
+
+    \State Then, as above, find $\{ \bar{c_s} \}^S_{s=E+1} \rightarrow \{ \bar{n_s} \}^S_{s=E+1} \rightarrow \{ \bar{b_s} \}^S_{s=E+2}$
+
+    \State $\bar{BQ}' \gets \{ \bar{r}, \bar{b}_s, \bar{\omega}_s, \bar{\rho}_s, \tilde{g}_n \}$ according to \textcolor{Fuchsia}{\eqref{eq:bequests_stat}}
+
+    \State $\bar{r}' \gets \{ \bar{\tau}^c,   \bar{n}_s, \bar{b}_s, \bar{\omega_s}, \bar{I}, \bar{i}_s, \tilde{g}_n, \alpha, A, \delta \}$ according to \textcolor{Fuchsia}{\eqref{eq:key_rate_explicit}}
+
+    \State $\bar{\tau}' \gets \{  \bar{n}_s, \bar{b}_s, \bar{w}, \bar{r}, \bar{X_s}, \bar{Y}, \bar{\omega}_s, \bar{N}_R, \delta \}$ according to \textcolor{Fuchsia}{\eqref{eq:tax_rates_stat}}\\
+
+    \State Update initial guesses: $\{ \bar{r};\  \bar{\tau};\ \bar{BQ} \}_i = \{ \xi \bar{r}' + (1 - \xi)\bar{r};\ \xi \bar{\tau}' + (1 - \xi) \bar{\tau};\ \xi \bar{BQ}' + (1 - \xi) \bar{BQ} \} $
+
+    \State \Until{$\{ (\bar{r}'- \bar{r})^2;\  (\bar{\tau}' - \bar{\tau})^2;\ (\bar{BQ}' - \bar{BQ})^2 \} < \{r_{tol};\ \tau_{tol};\ BQ_{tol} \}$}
+\end{algorithmic}
+\end{algorithm}
+
+When the algorithm is converged you obtain all the variables for all ages of the model in the steady state, thus the algorithm allows to fully define the steady state equilibrium. 
