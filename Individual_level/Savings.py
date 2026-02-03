@@ -9,7 +9,8 @@ def get_savings_path(
         X_vec: np.array,
         BQ_val: float,
         p_params: dict,
-        b_init: float = 0.0
+        b_init: float = 0.0,
+        clamp_to_zero: bool = False
 ) -> np.array:
     r"""
     Calculates the lifecycle savings path b_{s+1}.
@@ -18,6 +19,9 @@ def get_savings_path(
     Ref: eq:budget_constraint_stat
     e^g_y * \hat{b}_{s+1} = (1 - tau_l) * w * n + (1 + r_net) * \hat{b}_s + X + BQ - \hat{c}
     => \hat{b}_{s+1} = e^(-g_y) * [ Income + Assets - Consumption ]
+
+    :param clamp_to_zero: If True, enforces no-borrowing constraint by clamping
+                          savings to max(0, computed_value).
     """
     S = p_params['S']                  # max age of a household
     E = p_params['E']
@@ -51,6 +55,10 @@ def get_savings_path(
 
         # Next period savings (Stationary transformation)
         b_next = (resources - c_vec[s]) * stat_factor
+
+        # Optionally enforce no-borrowing constraint
+        if clamp_to_zero:
+            b_next = max(0.0, b_next)
 
         b_vec[s + 1] = b_next
 
