@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from Individual_level.Households import Household
 from State_level.Aggregates import Aggregator
 from State_level.Production import Firm
@@ -244,12 +245,16 @@ class SteadyStateEquilibrium:
 
             error = max(abs(r_diff), abs(BQ_diff), abs(policy_diff))
 
-            if i % 10 == 0:
-                print(
-                    f"Iter {i}: Error={error:.6f} | r={r:.4f} | BQ={BQ:.4f} | PolVar={curr_policy_var:.4f}")
-
             # Prepare result dictionary
             C_agg = self.aggregator.get_aggregate_consumption(c_vec)
+
+            if i % 20 == 0:
+                print(f"Iter {i}: Error={error:.6f}")
+                print(f"  guesses: r={r:.4f} | BQ={BQ:.4f} | PolVar={curr_policy_var:.4f}")
+                print(f"  implied: r_new={r_new:.4f} | BQ_new={BQ_new:.4f} | policy_new={policy_new:.4f}")
+                print(f"  aggregates: Y={Y_new:.4f} | K={K_new:.4f} | L={L_new:.4f} | C={C_agg:.4f} | w={w:.4f}")
+                print(25*"---")
+                
             final_res = {
                 'r': r_new,
                 'w': w,
@@ -282,6 +287,12 @@ class SteadyStateEquilibrium:
             print("\n--- DEBUG: Market Clearing Conditions ---")
             self.check_goods_market_clearing(final_res)
             self.check_euler_errors(final_res)
+            for par, val in final_res.items():
+                if isinstance(val, float):
+                    print(f'{par}: {val:.4f}')
+
+            self.check_vecs(final_res)
+            
             print("-----------------------------------------")
 
         if final_res and error < tol:
@@ -314,6 +325,34 @@ class SteadyStateEquilibrium:
 
         print(f"Goods Market: Supply Y = {Y:.4f}, Demand = {Y_demand:.4f}, Abs Diff = {abs(diff):.6e}")
         return diff
+        
+    def check_vecs(self, ss_dict: dict):
+        r"""
+        Checks the vectors in the steady state solution.
+        """
+        
+        plt.style.use('seaborn-v0_8-whitegrid')
+        fig, ax = plt.subplots(1, 3, figsize=[10, 2.5])
+
+        c_vec = ss_dict['c_vec'][self.params['E']:]
+        ax[0].plot(np.arange(self.params['E'], self.params['S']), c_vec)
+        ax[0].set_title('Consumption')
+        ax[0].set_xlabel('Age')
+        ax[0].set_ylabel('Consumption')
+
+        n_vec = ss_dict['n_vec'][self.params['E']:]
+        ax[1].plot(np.arange(self.params['E'], self.params['S']), n_vec)
+        ax[1].set_title('Labor')
+        ax[1].set_xlabel('Age')
+        ax[1].set_ylabel('Labor')
+
+        b_vec = ss_dict['b_vec'][self.params['E']:-1]
+        ax[2].plot(np.arange(self.params['E'], self.params['S']), b_vec)
+        ax[2].set_title('Savings')
+        ax[2].set_xlabel('Age')
+        ax[2].set_ylabel('Savings')
+        
+        plt.show()
 
     def check_euler_errors(self, ss_dict: dict):
         r"""
