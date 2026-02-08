@@ -10,7 +10,9 @@ def get_savings_path(
         BQ_val: float,
         p_params: dict,
         b_init: float = 0.0,
-        clamp_to_zero: bool = False
+        clamp_to_zero: bool = False,
+        debug: bool = False,
+        debug_prefix: str = ""
 ) -> np.array:
     r"""
     Calculates the lifecycle savings path b_{s+1}.
@@ -38,6 +40,15 @@ def get_savings_path(
 
     stat_factor = np.exp(-g_y)
 
+    # Optional debug accumulators (store per-age components of the b_next formula)
+    if debug:
+        T = S - E
+        labour_inc_vec = np.empty(T)
+        r_net_vec = np.empty(T)
+        capital_inc_vec = np.empty(T)
+        resources_vec = np.empty(T)
+        b_next_vec = np.empty(T)
+
     # Iterate through ages s to find b_{s+1}
     # Starting from E (first economic period) up to S-1
     for s in range(E, S):
@@ -61,6 +72,47 @@ def get_savings_path(
             b_next = max(0.0, b_next)
 
         b_vec[s + 1] = b_next
+
+        if debug:
+            j = s - E
+            labour_inc_vec[j] = labour_inc
+            r_net_vec[j] = r_net
+            capital_inc_vec[j] = capital_inc
+            resources_vec[j] = resources
+            b_next_vec[j] = b_next
+
+    if debug:
+        # For vectors, print averages (as requested). Slices exclude non-economic ages.
+        age_slice = slice(E, S)
+        age_slice_next = slice(E + 1, S + 1)
+        prefix = f" {debug_prefix}" if debug_prefix else ""
+        print(f"[get_savings_path{prefix}] b_vec formula components (means over s={E}..{S-1})")
+        print(
+            "  scalars:"
+            f" w={w:.6g}, tau_l={tau_l:.6g}, tau_k={tau_k:.6g}, g_y={g_y:.6g}, "
+            f"stat_factor={stat_factor:.6g}, BQ_val={BQ_val:.6g}, b_init={b_init:.6g}, "
+            f"clamp_to_zero={clamp_to_zero}"
+        )
+        print(
+            "  inputs (means):"
+            f" mean(n_vec)={float(np.mean(n_vec[age_slice])):.6g},"
+            f" mean(c_vec)={float(np.mean(c_vec[age_slice])):.6g},"
+            f" mean(r_vec)={float(np.mean(r_vec[age_slice])):.6g},"
+            f" mean(X_vec)={float(np.mean(X_vec[age_slice])):.6g}"
+        )
+        print(
+            "  components (means):"
+            f" mean(labour_inc)={float(np.mean(labour_inc_vec)):.6g},"
+            f" mean(r_net)={float(np.mean(r_net_vec)):.6g},"
+            f" mean(capital_inc)={float(np.mean(capital_inc_vec)):.6g},"
+            f" mean(resources)={float(np.mean(resources_vec)):.6g},"
+            f" mean(b_next)={float(np.mean(b_next_vec)):.6g}"
+        )
+        print(
+            "  assets (means):"
+            f" mean(b_s)={float(np.mean(b_vec[age_slice])):.6g},"
+            f" mean(b_s+1)={float(np.mean(b_vec[age_slice_next])):.6g}"
+        )
 
     # Return vector aligned with ages E+1 to S (decisions made)
     # Usually we want the 'stock' of assets at each age.

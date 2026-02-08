@@ -179,7 +179,9 @@ class SteadyStateEquilibrium:
                 r=r,
                 X_vec=X_vec,
                 BQ_val=BQ,
-                c_init_guess_range=(1e-5, 50.0)
+                c_init_guess_range=(1e-5, 50.0),
+                debug_savings=debug and i % 20 == 0,
+                debug_prefix=f"SS iter {i}"
             )
 
             if hh_res is None:

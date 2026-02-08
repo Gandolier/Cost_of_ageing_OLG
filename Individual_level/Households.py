@@ -30,8 +30,17 @@ class Household:
         self.E = self.params['E']
         self.rho = rho
 
-    def solve_decisions(self, c1_guess: float, w: float, r: float, X_vec: np.array, BQ_val: float,
-                        clamp_savings: bool = False):
+    def solve_decisions(
+            self,
+            c1_guess: float,
+            w: float,
+            r: float,
+            X_vec: np.array,
+            BQ_val: float,
+            clamp_savings: bool = False,
+            debug_savings: bool = False,
+            debug_prefix: str = ""
+    ):
         r"""
         Given an initial consumption guess c1, calculate the full path of variables.
 
@@ -55,7 +64,7 @@ class Household:
 
         # 3. Savings Path (Budget Constraint)
         b_vec = get_savings_path(c_vec, n_vec, w, r_vec, X_vec, BQ_val, self.params,
-                                 clamp_to_zero=clamp_savings)
+                                 clamp_to_zero=clamp_savings, debug=debug_savings, debug_prefix=debug_prefix)
 
         return c_vec, n_vec, b_vec
 
@@ -102,8 +111,16 @@ class Household:
         error = self.get_last_period_savings(c1_guess, w, r, X_vec, BQ_val)
         return error ** 2
 
-    def solve_steady_state(self, w: float, r: float, X_vec: np.array, BQ_val: float,
-                           c_init_guess_range: tuple = (1e-5, 50.0)):
+    def solve_steady_state(
+            self,
+            w: float,
+            r: float,
+            X_vec: np.array,
+            BQ_val: float,
+            c_init_guess_range: tuple = (1e-5, 50.0),
+            debug_savings: bool = False,
+            debug_prefix: str = ""
+    ):
         r"""
         Inner loop rootfinder algorithm that finds the optimal c_{E+1} (c1)
         such that the lifetime budget constraint holds (b_{last} = 0).
@@ -165,4 +182,8 @@ class Household:
                 )
 
         # Return the decision paths
-        return self.solve_decisions(c_optimal, w, r, X_vec, BQ_val, clamp_savings=False)
+        # Important: only print savings debug for the final optimal path (avoid spamming during Brent/minimize evals)
+        return self.solve_decisions(
+            c_optimal, w, r, X_vec, BQ_val, clamp_savings=False,
+            debug_savings=debug_savings, debug_prefix=debug_prefix
+        )
