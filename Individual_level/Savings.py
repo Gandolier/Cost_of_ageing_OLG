@@ -95,23 +95,23 @@ def get_savings_path(
         )
         print(
             "  inputs (means):"
-            f" mean(n_vec)={float(np.mean(n_vec[age_slice])):.6g},"
-            f" mean(c_vec)={float(np.mean(c_vec[age_slice])):.6g},"
-            f" mean(r_vec)={float(np.mean(r_vec[age_slice])):.6g},"
-            f" mean(X_vec)={float(np.mean(X_vec[age_slice])):.6g}"
+            f" n_vec={float(np.mean(n_vec[age_slice])):.6g},"
+            f" c_vec={float(np.mean(c_vec[age_slice])):.6g},"
+            f" r_vec={float(np.mean(r_vec[age_slice])):.6g},"
+            f" X_vec={float(np.mean(X_vec[age_slice])):.6g}"
         )
         print(
             "  components (means):"
-            f" mean(labour_inc)={float(np.mean(labour_inc_vec)):.6g},"
-            f" mean(r_net)={float(np.mean(r_net_vec)):.6g},"
-            f" mean(capital_inc)={float(np.mean(capital_inc_vec)):.6g},"
-            f" mean(resources)={float(np.mean(resources_vec)):.6g},"
-            f" mean(b_next)={float(np.mean(b_next_vec)):.6g}"
+            f" labour_inc={float(np.mean(labour_inc_vec)):.6g},"
+            f" r_net={float(np.mean(r_net_vec)):.6g},"
+            f" capital_inc={float(np.mean(capital_inc_vec)):.6g},"
+            f" resources={float(np.mean(resources_vec)):.6g},"
+            f" b_next={float(np.mean(b_next_vec)):.6g}"
         )
         print(
             "  assets (means):"
-            f" mean(b_s)={float(np.mean(b_vec[age_slice])):.6g},"
-            f" mean(b_s+1)={float(np.mean(b_vec[age_slice_next])):.6g}"
+            f" b_s={float(np.mean(b_vec[age_slice])):.6g},"
+            f" b_s+1={float(np.mean(b_vec[age_slice_next])):.6g}"
         )
 
     # Return vector aligned with ages E+1 to S (decisions made)
