@@ -256,6 +256,7 @@ class SteadyStateEquilibrium:
                 print(f"  implied: r_new={r_new:.4f} | BQ_new={BQ_new:.4f} | policy_new={policy_new:.4f}")
                 print(f"  aggregates: Y={Y_new:.4f} | K={K_new:.4f} | L={L_new:.4f} | C={C_agg:.4f} | w={w:.4f}")
                 print(25*"---")
+                break
                 
             final_res = {
                 'r': r_new,

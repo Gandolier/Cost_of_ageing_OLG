@@ -19,8 +19,7 @@ def get_savings_path(
     BQ_val is the stationary value of BQ. Note: BQ is distributed per capita.
 
     Ref: eq:budget_constraint_stat
-    e^g_y * \hat{b}_{s+1} = (1 - tau_l) * w * n + (1 + r_net) * \hat{b}_s + X + BQ - \hat{c}
-    => \hat{b}_{s+1} = e^(-g_y) * [ Income + Assets - Consumption ]
+    \hat{b}_{s+1} = e^(-g_y) * [(1 - tau_l) * w * n + (1 + r_net) * \hat{b}_s + X + BQ - \hat{c}]
 
     :param clamp_to_zero: If True, enforces no-borrowing constraint by clamping
                           savings to max(0, computed_value).
@@ -81,37 +80,43 @@ def get_savings_path(
             resources_vec[j] = resources
             b_next_vec[j] = b_next
 
+            print(
+                f"age s={s}\n"
+                f" (1-tau_l)={(1 - tau_l):.5g}; w={w:.5g}; n_s={n_vec[s]:.5g}; "
+                    f"(1-tau_l)*w*n={(1 - tau_l) * w * n_vec[s]:.5g}"
+
+                f" (1+r)={(1 + r_vec[s]):.5g}; b_s={b_vec[s]:.5g}; "
+                    f"(1+r)*b_s={(1 + r_vec[s]) * b_vec[s]:.5g};"
+
+                f" X_s={X_vec[s]:.5g}; BQ_val={BQ_val:.5g};"
+
+                f" e^(-g_y)={np.exp(-g_y):.5g}; c={c_vec[s]:.5g};"
+                f" b_s+1={b_next:.5g};\n"
+
+            )
+
     if debug:
         # For vectors, print averages (as requested). Slices exclude non-economic ages.
         age_slice = slice(E, S)
         age_slice_next = slice(E + 1, S + 1)
         prefix = f" {debug_prefix}" if debug_prefix else ""
         print(f"[get_savings_path{prefix}] b_vec formula components (means over s={E}..{S-1})")
+
         print(
-            "  scalars:"
-            f" w={w:.6g}, tau_l={tau_l:.6g}, tau_k={tau_k:.6g}, g_y={g_y:.6g}, "
-            f"stat_factor={stat_factor:.6g}, BQ_val={BQ_val:.6g}, b_init={b_init:.6g}, "
-            f"clamp_to_zero={clamp_to_zero}"
-        )
-        print(
-            "  inputs (means):"
-            f" n_vec={float(np.mean(n_vec[age_slice])):.6g},"
-            f" c_vec={float(np.mean(c_vec[age_slice])):.6g},"
-            f" r_vec={float(np.mean(r_vec[age_slice])):.6g},"
-            f" X_vec={float(np.mean(X_vec[age_slice])):.6g}"
-        )
-        print(
-            "  components (means):"
-            f" labour_inc={float(np.mean(labour_inc_vec)):.6g},"
-            f" r_net={float(np.mean(r_net_vec)):.6g},"
-            f" capital_inc={float(np.mean(capital_inc_vec)):.6g},"
-            f" resources={float(np.mean(resources_vec)):.6g},"
-            f" b_next={float(np.mean(b_next_vec)):.6g}"
+            f" (1-tau_l)={(1-tau_l):.5g}; w={w:.5g}; mean(n_vec)={np.mean(n_vec[age_slice]):.5g}; "
+                f"(1-tau_l)*w*n={(1-tau_l)*w*np.mean(n_vec[age_slice]):.5g}"
+            
+            f" (1+r)={(1+np.mean(r_vec)):.5g}; mean(b_vec)={np.mean(b_vec[age_slice]):.5g}; "
+                f"(1+r)*b_s={(1+np.mean(r_vec))*np.mean(b_vec[age_slice]):.5g};"
+            
+            f" max(X)={max(X_vec):.5g}; BQ_val={BQ_val:.5g};"
+            
+            f" e^(g_y)={np.exp(g_y):.5g}; e^(-g_y)={np.exp(-g_y):.5g}; mean(c_vec)={np.mean(c_vec[age_slice]):.5g};"
         )
         print(
             "  assets (means):"
-            f" b_s={float(np.mean(b_vec[age_slice])):.6g},"
-            f" b_s+1={float(np.mean(b_vec[age_slice_next])):.6g}"
+            f" b_s={np.mean(b_vec[age_slice]):.6g},"
+            f" b_s+1={np.mean(b_vec[age_slice_next]):.6g}"
         )
 
     # Return vector aligned with ages E+1 to S (decisions made)
