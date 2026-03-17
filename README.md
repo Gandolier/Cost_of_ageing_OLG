@@ -176,7 +176,7 @@ The solver supports two fiscal experiments via the `policy_mode` parameter:
 | Mode | `policy_mode` | What it solves for | What is fixed |
 |------|---------------|--------------------|---------------|
 | **Fix tax** | `'fix_tax'` | Pension benefit $\hat{X}$ | Tax rate of chosen type |
-| **Fix pension** | `'fix_pension'` | Required tax rate | Pension level $\hat{X} = \text{replacement\_rate} \times w$ |
+| **Fix pension** | `'fix_pension'` | Required tax rate | Pension level $\hat{X} = \text{replacement-rate} \times w$ |
 
 In `fix_pension` mode, the `tax_type` argument selects which tax instrument adjusts (`'tau_l'`, `'tau_k'`, or `'tau_c'`). This enables counterfactual analysis: "If the pension replacement rate is held constant as the population ages, how much must tax rates rise?"
 
