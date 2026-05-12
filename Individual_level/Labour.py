@@ -7,7 +7,7 @@ def get_labour_supply(w: float, c_vec: np.array, p_params: dict) -> np.array:
     Ensure inputs are arrays or broadcast correctly
     w is scalar in SS, tau_l is vector
 
-    Ref: eq:labour_function_explicit
+    Ref: eq:labour_n
     n_{s,t} = l_tilde * [ 1 + ( term )^(upsilon / (upsilon - 1)) ] ^ (-1/upsilon)
     where term = (b * c^sigma) / (l_tilde * w * (1 - tau_l))
     """
@@ -18,6 +18,7 @@ def get_labour_supply(w: float, c_vec: np.array, p_params: dict) -> np.array:
     b_ellip = p_params['b_ellip']  # \b in utility function
     upsilon = p_params['upsilon']  # \upsilon in utility function
     tau_l = p_params['tau_l']  # labour income tax rate
+    chi_s = p_params['chi_s'][E:]
 
     n_vec = np.zeros(S)
 
@@ -34,7 +35,7 @@ def get_labour_supply(w: float, c_vec: np.array, p_params: dict) -> np.array:
     # Numerator: b * c^sigma
     # c_vec is 0 before E, so slice it
     c_active = c_vec[E:]
-    numer = b_ellip * (c_active ** sigma)
+    numer = b_ellip * (c_active ** sigma) * chi_s
 
     # Denominator: l_tilde * net_wage
     denom = l_tilde * net_wage

@@ -5,16 +5,9 @@ import sys
 repo_root = Path.cwd().parent  # notebook dir -> project root
 sys.path.insert(0, str(repo_root))
 
-from main import reimport
-import warnings
-warnings.filterwarnings('ignore')
-
-from Steady_state_equilibrium.SS_Solver import SteadyStateEquilibrium
-
 import numpy as np
 import pandas as pd
 import scipy.interpolate as si
-from matplotlib import pyplot as plt
 
 
 def get_omega(

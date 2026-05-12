@@ -7,7 +7,7 @@ def get_savings_path(
         w: float,
         r_vec: np.array,
         X_vec: np.array,
-        BQ_val: float,
+        BQ_vec: np.array,
         p_params: dict,
         b_init: float = 0.0,
         clamp_to_zero: bool = False,
@@ -16,10 +16,10 @@ def get_savings_path(
 ) -> np.array:
     r"""
     Calculates the lifecycle savings path b_{s+1}.
-    BQ_val is the stationary value of BQ. Note: BQ is distributed per capita.
+    BQ_vec is the stationary value of bequests received at each age.
 
     Ref: eq:budget_constraint_stat
-    \hat{b}_{s+1} = e^(-g_y) * [(1 - tau_l) * w * n + (1 + r_net) * \hat{b}_s + X + BQ - \hat{c}]
+    \hat{b}_{s+1} = e^(-g_y) * [(1 - tau_l) * w * n + (1 + r_net) * \hat{b}_s + X + BQ_s - \hat{c}]
 
     :param clamp_to_zero: If True, enforces no-borrowing constraint by clamping
                           savings to max(0, computed_value).
@@ -60,8 +60,8 @@ def get_savings_path(
 
         # Total Resources
         # In tex eq:budget_constraint: + BQ_t / N_tilde_t.
-        # We assume BQ_val passed here is already normalized (\hat{BQ}).
-        resources = labour_inc + capital_inc + X_vec[s] + BQ_val
+        # We assume BQ_vec passed here is already normalized (\hat{BQ}).
+        resources = labour_inc + capital_inc + X_vec[s] + BQ_vec[s]
 
         # Next period savings (Stationary transformation)
         b_next = (resources - c_vec[s]) * stat_factor
@@ -88,7 +88,7 @@ def get_savings_path(
                 f" (1+r)={(1 + r_vec[s]):.5g}; b_s={b_vec[s]:.5g}; "
                     f"(1+r)*b_s={(1 + r_vec[s]) * b_vec[s]:.5g};"
 
-                f" X_s={X_vec[s]:.5g}; BQ_val={BQ_val:.5g};"
+                f" X_s={X_vec[s]:.5g}; BQ_s={BQ_vec[s]:.5g};"
 
                 f" e^(-g_y)={np.exp(-g_y):.5g}; c={c_vec[s]:.5g};"
                 f" b_s+1={b_next:.5g};\n"
@@ -109,7 +109,7 @@ def get_savings_path(
             f" (1+r)={(1+np.mean(r_vec)):.5g}; mean(b_vec)={np.mean(b_vec[age_slice]):.5g}; "
                 f"(1+r)*b_s={(1+np.mean(r_vec))*np.mean(b_vec[age_slice]):.5g};"
             
-            f" max(X)={max(X_vec):.5g}; BQ_val={BQ_val:.5g};"
+            f" max(X)={max(X_vec):.5g}; mean(BQ)={np.mean(BQ_vec):.5g};"
             
             f" e^(g_y)={np.exp(g_y):.5g}; e^(-g_y)={np.exp(-g_y):.5g}; mean(c_vec)={np.mean(c_vec[age_slice]):.5g};"
         )

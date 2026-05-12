@@ -7,6 +7,17 @@ from Individual_level.Savings import get_savings_path
 from main import reimport
 
 
+def build_bq_receipt_vec(BQ_val, omega, E, R):
+    """Distribute aggregate bequests across working-age cohorts only."""
+    # working age: E+1 to R. In 0-indexed: index E to R-1.
+    N_working = np.sum(omega[E:R])
+    bq_per_recipient = BQ_val / N_working if N_working > 0 else 0.0
+
+    bq_receipt = np.zeros_like(omega)
+    bq_receipt[E:R] = bq_per_recipient  # E+1 to R receive; s > R get 0
+    return bq_receipt
+
+
 class Household:
     r"""
     Represents the representative household's lifecycle problem in the Steady State.
@@ -36,7 +47,7 @@ class Household:
             w: float,
             r: float,
             X_vec: np.array,
-            BQ_val: float,
+            BQ_vec: np.array,
             clamp_savings: bool = False,
             debug_savings: bool = False,
             debug_prefix: str = ""
@@ -47,6 +58,7 @@ class Household:
         :param clamp_savings: If True, clamps savings to be non-negative in the path.
         """
         assert len(X_vec) == self.S, f"X_vec length {len(X_vec)} must match S {self.S}"
+        assert len(BQ_vec) == self.S, f"BQ_vec length {len(BQ_vec)} must match S {self.S}"
 
         # In SS, r is constant across ages/time, but we support vector if needed
         if isinstance(r, float):
@@ -63,13 +75,13 @@ class Household:
         n_vec = get_labour_supply(w, c_vec, self.params)
 
         # 3. Savings Path (Budget Constraint)
-        b_vec = get_savings_path(c_vec, n_vec, w, r_vec, X_vec, BQ_val, self.params,
+        b_vec = get_savings_path(c_vec, n_vec, w, r_vec, X_vec, BQ_vec, self.params,
                                  clamp_to_zero=clamp_savings, debug=debug_savings, debug_prefix=debug_prefix)
 
         return c_vec, n_vec, b_vec
 
     def get_last_period_savings(self, c1_guess: float, w: float, r: float,
-                                 X_vec: np.array, BQ_val: float) -> float:
+                                 X_vec: np.array, BQ_vec: np.array) -> float:
         r"""
         Error function for the rootfinder (Shooting Method).
         Target: Savings at end of life (b_{S+1}) should be 0.
@@ -82,7 +94,7 @@ class Household:
         The penalty preserves monotonicity: higher c1 → lower (more negative) return.
         """
         try:
-            _, _, b_vec = self.solve_decisions(c1_guess, w, r, X_vec, BQ_val, clamp_savings=False)
+            _, _, b_vec = self.solve_decisions(c1_guess, w, r, X_vec, BQ_vec, clamp_savings=False)
 
             # Terminal condition: b_{S+1}
             terminal = b_vec[self.S]
@@ -103,12 +115,12 @@ class Household:
             return 1e10
 
     def get_squared_error(self, c1_guess: float, w: float, r: float,
-                          X_vec: np.array, BQ_val: float) -> float:
+                          X_vec: np.array, BQ_vec: np.array) -> float:
         r"""
         Squared error objective for minimization-based fallback.
         Minimizes (terminal + penalty)^2.
         """
-        error = self.get_last_period_savings(c1_guess, w, r, X_vec, BQ_val)
+        error = self.get_last_period_savings(c1_guess, w, r, X_vec, BQ_vec)
         return error ** 2
 
     def solve_steady_state(
@@ -117,6 +129,7 @@ class Household:
             r: float,
             X_vec: np.array,
             BQ_val: float,
+            omega: np.array,
             c_init_guess_range: tuple = (1e-5, 50.0),
             debug_savings: bool = False,
             debug_prefix: str = ""
@@ -134,13 +147,17 @@ class Household:
         Ref: algo:steady_state_solution
         """
         assert len(X_vec) == self.S, f"X_vec length {len(X_vec)} must match S {self.S}"
+        assert len(omega) == self.S, f"omega length {len(omega)} must match S {self.S}"
         assert c_init_guess_range[0] < c_init_guess_range[1], "c_init_guess_range must be (low, high) with low < high"
+
+        # Build Bequest Receipt Vector
+        BQ_vec = build_bq_receipt_vec(BQ_val, omega, self.params['E'], self.params['R'])
 
         c_low, c_high = c_init_guess_range
 
         # Evaluate error at bracket endpoints
-        f_low = self.get_last_period_savings(c_low, w, r, X_vec, BQ_val)
-        f_high = self.get_last_period_savings(c_high, w, r, X_vec, BQ_val)
+        f_low = self.get_last_period_savings(c_low, w, r, X_vec, BQ_vec)
+        f_high = self.get_last_period_savings(c_high, w, r, X_vec, BQ_vec)
 
         c_optimal = None
 
@@ -150,7 +167,7 @@ class Household:
                 c_optimal = brentq(
                     self.get_last_period_savings,
                     c_low, c_high,
-                    args=(w, r, X_vec, BQ_val),
+                    args=(w, r, X_vec, BQ_vec),
                     xtol=1e-5
                 )
             except ValueError:
@@ -166,13 +183,13 @@ class Household:
                 self.get_squared_error,
                 bounds=(c_low, c_high),
                 method='bounded',
-                args=(w, r, X_vec, BQ_val),
+                args=(w, r, X_vec, BQ_vec),
                 options={'xatol': 1e-6}
             )
             c_optimal = result.x
 
             # Check solution quality
-            final_error = self.get_last_period_savings(c_optimal, w, r, X_vec, BQ_val)
+            final_error = self.get_last_period_savings(c_optimal, w, r, X_vec, BQ_vec)
             if abs(final_error) > 1e-2:
                 import warnings
                 warnings.warn(
@@ -184,6 +201,6 @@ class Household:
         # Return the decision paths
         # Important: only print savings debug for the final optimal path (avoid spamming during Brent/minimize evals)
         return self.solve_decisions(
-            c_optimal, w, r, X_vec, BQ_val, clamp_savings=False,
+            c_optimal, w, r, X_vec, BQ_vec, clamp_savings=False,
             debug_savings=debug_savings, debug_prefix=debug_prefix
         )

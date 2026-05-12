@@ -121,7 +121,7 @@ class SteadyStateEquilibrium:
                 raise ValueError(f"Unknown tax_type {tax_type}")
 
             # Initial guess for X is 0 as requested
-            curr_policy_var = 0.0
+            #curr_policy_var = 0.0
 
         elif policy_mode == 'fix_pension':
             # tax_guess is the initial guess for the rate of 'tax_type'
@@ -179,6 +179,7 @@ class SteadyStateEquilibrium:
                 r=r,
                 X_vec=X_vec,
                 BQ_val=BQ,
+                omega=self.omega,
                 c_init_guess_range=(1e-5, 50.0),
                 debug_savings=debug and i % 20 == 0,
                 debug_prefix=f"SS iter {i}"
@@ -250,13 +251,13 @@ class SteadyStateEquilibrium:
             # Prepare result dictionary
             C_agg = self.aggregator.get_aggregate_consumption(c_vec)
 
-            if i % 20 == 0:
+            if debug and i % 20 == 0:
                 print(f"Iter {i}: Error={error:.6f}")
                 print(f"  guesses: r={r:.4f} | BQ={BQ:.4f} | PolVar={curr_policy_var:.4f}")
                 print(f"  implied: r_new={r_new:.4f} | BQ_new={BQ_new:.4f} | policy_new={policy_new:.4f}")
                 print(f"  aggregates: Y={Y_new:.4f} | K={K_new:.4f} | L={L_new:.4f} | C={C_agg:.4f} | w={w:.4f}")
                 print(25*"---")
-                break
+                #break
                 
             final_res = {
                 'r': r_new,
