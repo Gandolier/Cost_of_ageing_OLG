@@ -4,6 +4,7 @@ from scipy.optimize import brentq, minimize_scalar
 from Individual_level.Consumption import get_consumption_path
 from Individual_level.Labour import get_labour_supply
 from Individual_level.Savings import get_savings_path
+from Individual_level.HabitUtility import compute_M_from_c
 from main import reimport
 
 
@@ -71,8 +72,11 @@ class Household:
         # 1. Consumption Path (Euler Equation)
         c_vec = get_consumption_path(c1_guess, r_vec, self.rho, self.params)
 
-        # 2. Labour Supply (Intratemporal FOC)
-        n_vec = get_labour_supply(w, c_vec, self.params)
+        # 2. Effective marginal utility (habit-aware; at h=0 reduces to c^(-sigma))
+        M_vec = compute_M_from_c(c_vec, self.rho, self.params)
+
+        # 3. Labour Supply (Intratemporal FOC, now driven by M_vec)
+        n_vec = get_labour_supply(w, M_vec, self.params)
 
         # 3. Savings Path (Budget Constraint)
         b_vec = get_savings_path(c_vec, n_vec, w, r_vec, X_vec, BQ_vec, self.params,

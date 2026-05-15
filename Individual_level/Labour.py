@@ -1,54 +1,42 @@
 import numpy as np
 
 
-def get_labour_supply(w: float, c_vec: np.array, p_params: dict) -> np.array:
+def get_labour_supply(w: float, M_vec: np.ndarray, p_params: dict) -> np.ndarray:
     r"""
-    Calculates stationary labour supply n_{s,t} given consumption path.
-    Ensure inputs are arrays or broadcast correctly
-    w is scalar in SS, tau_l is vector
+    Calculates stationary labour supply n_{s,t} given the effective marginal
+    utility of consumption M_vec.
 
-    Ref: eq:labour_n
-    n_{s,t} = l_tilde * [ 1 + ( term )^(upsilon / (upsilon - 1)) ] ^ (-1/upsilon)
-    where term = (b * c^sigma) / (l_tilde * w * (1 - tau_l))
+    Ref: habits_derivations.md §5.5 (replaces paper eq. 2.28)
+        n_s = l_tilde * [ 1 + ( chi_s * b / (l_tilde * (1 - tau_l) * w * M_s) )
+                            ^( upsilon / (upsilon - 1) ) ] ^ ( -1 / upsilon )
+
+    At h = 0, M_s = c_s^(-sigma) and this reduces to the original no-habit FOC.
+
+    Inputs:
+        w        : stationary wage (scalar in SS)
+        M_vec    : effective marginal utility, length S, zeros for s < E
+        p_params : household parameter dict (S, E, ltilde, b_ellip, upsilon, tau_l, chi_s)
     """
     S = p_params['S']
     E = p_params['E']
-    sigma = p_params['sigma']  # coefficient of relative risk aversion
-    l_tilde = p_params['ltilde']  # time endowment per period
-    b_ellip = p_params['b_ellip']  # \b in utility function
-    upsilon = p_params['upsilon']  # \upsilon in utility function
-    tau_l = p_params['tau_l']  # labour income tax rate
+    l_tilde = p_params['ltilde']
+    b_ellip = p_params['b_ellip']
+    upsilon = p_params['upsilon']
+    tau_l = p_params['tau_l']
     chi_s = p_params['chi_s'][E:]
+
+    net_wage = w * (1 - tau_l)
+    assert net_wage > 0, "Net wage must be strictly positive"
+    assert np.all(M_vec[E:] > 0), "M_vec must be strictly positive over [E, S)"
 
     n_vec = np.zeros(S)
 
-    # Calculate only for economically active population [E:]
-    # Slicing inputs
-    # Note: w * (1 - tau_l) is the net wage
-    # tau_l is a scalar float
-    tau_l_active = tau_l
-
-    net_wage = w * (1 - tau_l_active)
-
-    assert np.all(net_wage > 0), "Net wage must be strictly positive for all ages"
-
-    # Numerator: b * c^sigma
-    # c_vec is 0 before E, so slice it
-    c_active = c_vec[E:]
-    numer = b_ellip * (c_active ** sigma) * chi_s
-
-    # Denominator: l_tilde * net_wage
-    denom = l_tilde * net_wage
-
+    # Inside parenthesis of the FOC: chi_s * b / (l_tilde * net_wage * M_s)
+    numer = chi_s * b_ellip
+    denom = l_tilde * net_wage * M_vec[E:]
     ratio = np.maximum(numer / denom, 1e-10)
 
-    # Power term
     exponent = upsilon / (upsilon - 1)
-
-    # Final formula
-    # n = l_tilde * (1 + ratio^exponent)^(-1/upsilon)
-    n_active = l_tilde * (1 + ratio ** exponent) ** (-1 / upsilon)
-
-    n_vec[E:] = n_active
+    n_vec[E:] = l_tilde * (1 + ratio ** exponent) ** (-1 / upsilon)
 
     return n_vec
