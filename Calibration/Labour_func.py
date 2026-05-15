@@ -169,7 +169,7 @@ def build_target_labour_profile(
         Offset from tail_start_age to the left anchor age, typically 0.
     return_components : bool
         If True, returns (n_target, ep_profile, hours_profile) for diagnostics.
-
+ 
     Returns
     -------
     np.ndarray of shape (S,)
