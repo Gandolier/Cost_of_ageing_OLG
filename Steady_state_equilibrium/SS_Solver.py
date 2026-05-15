@@ -417,7 +417,7 @@ class SteadyStateEquilibrium:
 
         required_params = ('A', 'alpha', 'delta', 'tau_c', 'tau_l', 'tau_k', 'R', 'E',
                            'g_n', 'g_y', 'beta', 'sigma', 'replacement_rate', 'ltilde',
-                           'b_ellip', 'upsilon')
+                           'b_ellip', 'upsilon', 'h')
         self._check_keys(params, required_params, "params")
 
         required_vectors = ('omega', 'rho', 'i_rate', 'I_total')
@@ -438,6 +438,7 @@ class SteadyStateEquilibrium:
         assert 0 <= params['delta'] <= 1, f"delta must be in [0,1], got {params['delta']}"
         assert params['R'] > params['E'], f"R must be > E, got R={params['R']}, E={params['E']}"
         assert all(0 <= params[t] < 1 for t in ('tau_l', 'tau_k', 'tau_c')), "tax rates must be in [0,1)"
+        assert 0 <= params['h'] < 1, f"h must be in [0,1), got {params['h']}"
 
 
     def _validate_solve_inputs(self, r_guess, BQ_guess, tax_guess, policy_mode, tax_type, xi, max_iter):

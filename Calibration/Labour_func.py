@@ -88,6 +88,7 @@ def calibrate_chi(params, vectors, n_target,
     chi_s = np.ones(S)  # initial guess: paper's original specification
     params = dict(params)  # local copy so we can write chi_s in
     params['chi_s'] = chi_s
+    params.setdefault('h', 0.0)  # backward-compatibility: no habit formation by default
 
     final_result = None
 
@@ -169,7 +170,7 @@ def build_target_labour_profile(
         Offset from tail_start_age to the left anchor age, typically 0.
     return_components : bool
         If True, returns (n_target, ep_profile, hours_profile) for diagnostics.
- 
+
     Returns
     -------
     np.ndarray of shape (S,)

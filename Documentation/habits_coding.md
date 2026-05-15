@@ -424,7 +424,7 @@ To prevent scope creep: do not modify `Aggregates.py`, `Production.py`, `PublicS
 
 Do not delete `get_consumption_path` in `Consumption.py`. It remains useful as an initial-guess generator. Just leave it, and add the docstring note.
 
-Do not optimise the root-finder's performance until you have correctness. The `hybr` method with `xtol=1e-8` is the default; don't switch to faster methods that may be less robust until Stage 7 is passing reliably.
+Do not optimise the root-finder's performance until you have correctness. The `hybr` method with `xtol=1e-5` is the default; don't switch to faster methods that may be less robust until Stage 7 is passing reliably.
 
 ## Required Sanity Output at Each Stage
 
@@ -436,3 +436,59 @@ After every stage, the agent must report the following three numbers from a clea
 Stages 1 through 6 must all produce identical values for these three numbers (to numerical precision). If they don't, halt and debug — the implementation has a bug, and any habit-related behavior observed thereafter is meaningless.
 
 Once `h > 0` (Stage 7+), these numbers will change, and the comparison switches to: did the root-finder converge, and is the consumption profile monotonically flatter than the no-habit baseline.
+
+## Reference parameter set for checks
+It is a parameter set used now, before any changes to the model are implemented. 
+
+```
+pops = pd.read_csv('../Data/pops.csv')
+omega = pops['omega']
+rho = pops['rho']
+i = pops['i']
+g_n = -0.00568
+params = {
+    'A': 1.4,
+    'alpha': .39,
+    'delta': .05,
+    'tau_c': 0.,
+    'tau_l': .22,
+    'tau_k': 0.,
+    'R': 62,
+    'E': 20,
+    'S': 100,
+    'g_n': g_n,
+    'g_y': .04,
+    'beta': .94,
+    'sigma': 1.97,
+    'replacement_rate': .3,
+    'ltilde': 1.,
+    'b_ellip': .4309,
+    'upsilon': 1.7648,
+    'chi_s': np.ones(100),
+}
+# Normalizing population to 1 for convenience
+pop_base = omega.sum()
+omega_norm = omega / pop_base
+I_norm = -0.251822 / pop_base
+
+vectors = {
+    'omega': omega_norm.values,
+    'rho': rho.values,
+    'i_rate': i.values,
+    'I_total': I_norm,
+}
+
+solver_params = {
+    'r_guess': 0.05,
+    'BQ_guess': 0.2,
+    'tax_guess': .22,
+    'policy_mode': 'fix_tax',
+    'tax_type': 'tau_l',
+    'xi': 0.1,
+    'tol': 1e-2,
+    'max_iter': 800,
+    'debug': False
+}
+```
+
+In case you would want to calibrate the $\chi_s$ profile, here is the `n_target` at `'../Data/n_target.csv'`
