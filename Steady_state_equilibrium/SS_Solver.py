@@ -38,6 +38,7 @@ class SteadyStateEquilibrium:
         self.i_rate = vectors['i_rate']         # size S x 1 vector of net migration rates by age
         self.I_total = vectors['I_total']       # size 1 x T vector of total net migration by time
         self.g_n = params['g_n']                # g_n = N_t+1 / N_t - 1
+        self.S = params['S']
 
         # Initialize Economic Agents
         self.household = Household(self.params, self.rho)
@@ -170,7 +171,7 @@ class SteadyStateEquilibrium:
             self._sync_params()
 
             # Construct X vector
-            X_vec = np.zeros_like(self.omega)
+            X_vec = np.zeros(self.S)
             X_vec[self.gov.R_idx:] = X_val
 
             # 2. Households (Inner Loop)

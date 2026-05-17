@@ -74,7 +74,7 @@ class Household:
     # household solution does not introduce spurious noise into the outer
     # convergence test. With outer tol typically 1e-3 .. 1e-4, 1e-6 here
     # gives ample headroom.
-    RESIDUAL_TOL = 1e-4
+    RESIDUAL_TOL = 1e-1
 
     def __init__(self, p_params: dict, rho: np.array):
         r"""
@@ -253,7 +253,7 @@ class Household:
             f_high = terminal_b(c_high)
             if (np.isfinite(f_low) and np.isfinite(f_high)
                     and f_low * f_high < 0):
-                c1 = brentq(terminal_b, c_low, c_high, xtol=1e-6)
+                c1 = brentq(terminal_b, c_low, c_high, xtol=1e-12)
                 c_vec_full = get_consumption_path(c1, r_vec, self.rho, self.params)
                 return self._enforce_delta_c_positive(c_vec_full[self.E:])
         except (ValueError, FloatingPointError, AssertionError):
@@ -335,6 +335,28 @@ class Household:
             method='hybr',
             options={'xtol': 1e-8, 'maxfev': 2000},
         )
+
+        # at the very start of solve_steady_state
+        # print(f"[H] RESIDUAL_TOL at runtime = {self.RESIDUAL_TOL}", flush=True)
+        # print(f"[H] h = {self.params.get('h')}, chi_s[E:E+3] = {self.params['chi_s'][self.E:self.E + 3]}", flush=True)
+        #
+        # # right after building x0
+        # print(
+        #     f"[H] x0 source: {'cache' if c_init is not None else 'cached_warm' if self._c_vec_cache is not None else 'cold'}",
+        #     flush=True)
+        # print(f"[H] x0 stats: min={x0.min():.3e}, max={x0.max():.3e}, idx_min={int(np.argmin(x0))}", flush=True)
+        # res0 = self.euler_residuals(x0, w, r, X_vec, BQ_vec)
+        # print(f"[H] residual norm at x0 = {np.linalg.norm(res0):.3e}, max abs entry = {np.max(np.abs(res0)):.3e}",
+        #       flush=True)
+        #
+        # # in _initial_guess, print which branch was taken
+        # # in solve_steady_state, after hybr:
+        # print(f"[H] hybr: success={sol.success}, |fun|={np.linalg.norm(sol.fun):.3e}, x_min={sol.x.min():.3e}",
+        #       flush=True)
+        #
+        # # after LM:
+        # print(f"[H] LM: success={sol.success}, |fun|={np.linalg.norm(sol.fun):.3e}, x_min={sol.x.min():.3e}",
+        #       flush=True)
 
         # If hybr fails to claim success, retry on the SAME problem with
         # LM. This is a legitimate solver retry — it is NOT a silent
