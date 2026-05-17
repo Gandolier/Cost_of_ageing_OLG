@@ -36,17 +36,18 @@ def fit_ellip(ellip_init, elast_Frisch, ltilde):
     return b_ellip, upsilon
 
 
-def update_chi_from_foc(c_vec, w, tau_l, n_target, params):
+def update_chi_from_foc(c_vec, w, tau_l, n_target, rho, params):
     """
-    Closed-form inverse of the labor FOC:
-        chi_s = [l_tilde * (1 - tau_l) * w / (b * c_s^sigma)]
+    Closed-form inverse of the habit-modified labor FOC:
+        chi_s = [l_tilde * (1 - tau_l) * w * M_s / b]
                 * (eta_s^(-upsilon) - 1)^((upsilon - 1) / upsilon)
-    where eta_s = n_target_s / l_tilde.
+    where eta_s = n_target_s / l_tilde and M_s is the habit-adjusted
+    effective marginal utility of consumption (see HabitUtility.py).
 
-    Given equilibrium c_vec, w, tau_l from a baseline SS run, returns the chi_s
-    vector that would make the FOC produce exactly n_s = n_target_s.
+    At h=0, M_s = c_s^(-sigma) and the formula reduces to the original.
     """
-    sigma = params['sigma']
+    from Individual_level.HabitUtility import compute_M_from_c
+
     upsilon = params['upsilon']
     b = params['b_ellip']
     l_tilde = params['ltilde']
@@ -62,13 +63,16 @@ def update_chi_from_foc(c_vec, w, tau_l, n_target, params):
     # The leisure-bracket from the FOC, raised to (upsilon-1)/upsilon
     leisure_term = (eta ** (-upsilon) - 1) ** ((upsilon - 1) / upsilon)
 
+    # Habit-formation effective marginal utility
+    M_vec = compute_M_from_c(c_vec, rho, params)
+
     # Direct closed-form
-    chi_s[E:] = (l_tilde * (1 - tau_l) * w * leisure_term) / (b * c_vec[E:] ** sigma)
+    chi_s[E:] = (l_tilde * (1 - tau_l) * w * leisure_term * M_vec[E:]) / b
 
     return chi_s
 
 def calibrate_chi(params, vectors, n_target,
-                  max_iter=50, tol=1e-4, xi_chi=0.5,
+                  max_iter=50, tol=1e-4, xi_chi=0.9,
                   ss_solve_kwargs=None):
     """
     Outer calibration loop. At each iteration:
@@ -106,11 +110,13 @@ def calibrate_chi(params, vectors, n_target,
             w=result['w'],
             tau_l=result['tau_l'],
             n_target=n_target,
+            rho=vectors['rho'],
             params=params,
         )
 
         # Step 4: convergence check on chi_s
-        err = np.max(np.abs(chi_s_new[params['E']:] - chi_s[params['E']:]))
+        denom = np.maximum(np.abs(chi_s[params['E']:]), 1.0)
+        err = np.max(np.abs(chi_s_new[params['E']:] - chi_s[params['E']:]) / denom)
         print(f"Chi-iter {k}: max |dchi| = {err:.3e}, "
               f"r = {result['r']:.4f}, w = {result['w']:.4f}")
 
