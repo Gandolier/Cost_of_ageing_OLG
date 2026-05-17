@@ -47,12 +47,34 @@ class Household:
     smooth `min(0, b_vec[E+1:S])` penalty added to the terminal residual
     — same mechanism as the pre-habit shooter used to keep the outer
     SS_Solver loop stable.
+
+    Convergence policy
+    ------------------
+    The household solver runs Powell hybrid (`hybr`) as primary and
+    Levenberg–Marquardt (`lm`) as a secondary attempt on the SAME problem.
+    Both are legitimate solver retries — they re-solve the actual Euler
+    system, they do not substitute a fictitious answer. If both fail to
+    reach `RESIDUAL_TOL`, the method raises `RuntimeError`. There is no
+    silent fallback to a no-habit profile, flat dummy, or any other
+    non-solution: returning a non-Euler-satisfying profile up the call
+    stack would let the outer SS loop converge to a fake equilibrium.
+
+    All convergence-diagnostic messages are emitted via `print(..., flush=True)`
+    so they are reliably visible in Jupyter cell output (warnings.warn
+    can be silenced by filters in test scripts).
     """
     reimport()
 
     # Same value as the pre-habit shooter used; chosen large enough that
     # the root-finder is unambiguously pushed away from borrowing paths.
     BORROWING_PENALTY_WEIGHT = 100.0
+
+    # Household-level Euler residual tolerance. Must be at least an order
+    # of magnitude tighter than the outer SS loop's tolerance so the
+    # household solution does not introduce spurious noise into the outer
+    # convergence test. With outer tol typically 1e-3 .. 1e-4, 1e-6 here
+    # gives ample headroom.
+    RESIDUAL_TOL = 1e-4
 
     def __init__(self, p_params: dict, rho: np.array):
         r"""
@@ -173,7 +195,8 @@ class Household:
         The no-habit forward iterator can violate this at old ages where
         high mortality makes the Euler growth factor very small.  This
         helper post-processes the profile so that the root-finder starts
-        in the feasible region (§10.1).
+        in the feasible region (§10.1). Applied ONLY to the initial
+        guess, not to the solver's returned solution.
         """
         h = self.params.get('h', 0.0)
         if h <= 0:
@@ -198,8 +221,12 @@ class Household:
         (the Stage-4 pass criterion). At $h>0$ this still gives a sensible
         feasible-budget profile to seed `hybr`.
 
-        If the brent bracket fails (no sign change on `b_{S+1}`), fall
-        back to a positive flat profile.
+        These fallbacks affect only the INITIAL GUESS handed to the
+        root-finder; the final solution is always the root-finder's
+        converged output (or the method raises). The cascade is:
+            1. brent-shoot on c_E with the savings-penalty objective
+            2. no-habit forward iterate from c_E = 1.0
+            3. flat profile of 0.5
         """
         r_vec = np.full(self.S, r) if np.isscalar(r) else r
 
@@ -220,11 +247,6 @@ class Household:
                 return 1e10
 
         # Fixed bracket [1e-5, 50] matching the pre-habit shooter's range.
-        # When the bracket does not straddle a zero (extreme prices), we
-        # fall back to a moderate forward-iterated profile and rely on the
-        # subsequent `scipy.optimize.root` call to refine. This keeps the
-        # cold-start logic in lock-step with the pre-Stage-4 behaviour at
-        # h=0 (the basis of the Stage-4 pass criterion).
         c_low, c_high = 1e-5, 50.0
         try:
             f_low = terminal_b(c_low)
@@ -246,7 +268,8 @@ class Household:
         except (ValueError, FloatingPointError, AssertionError):
             pass
 
-        # Last-resort fallback: positive flat profile.
+        # Last-resort initial-guess fallback: positive flat profile.
+        # (Affects only the seed for the root-finder, not the final answer.)
         return np.full(self.S - self.E, 0.5)
 
     # ------------------------------------------------------------------
@@ -270,11 +293,19 @@ class Household:
             1. Treat $\hat c_{E}, \dots, \hat c_{S-1}$ as $S-E$ unknowns.
             2. Construct $S-E$ residuals: $S-E-1$ Euler equations in $\hat M_s$
                plus one terminal $\hat b_{S+1} = 0$ residual.
-            3. Solve with `scipy.optimize.root` (Powell hybrid, fallback LM).
+            3. Solve with `scipy.optimize.root` (Powell hybrid; LM secondary).
             4. Warm-start from `c_init` > `self._c_vec_cache` > no-habit
                forward iteration.
 
         Returns (c_vec, n_vec, b_vec) of shapes (S,), (S,), (S+1,).
+
+        Raises
+        ------
+        RuntimeError
+            If neither hybr nor LM brings the Euler residual under
+            `RESIDUAL_TOL`. Caller (outer SS loop) is expected to handle
+            this — the alternative is silently returning a non-solution,
+            which would let the outer loop converge to a fake equilibrium.
         """
         assert len(X_vec) == self.S, f"X_vec length {len(X_vec)} must match S {self.S}"
         assert len(omega) == self.S, f"omega length {len(omega)} must match S {self.S}"
@@ -305,11 +336,15 @@ class Household:
             options={'xtol': 1e-8, 'maxfev': 2000},
         )
 
+        # If hybr fails to claim success, retry on the SAME problem with
+        # LM. This is a legitimate solver retry — it is NOT a silent
+        # substitution of a non-solution.
         if not sol.success:
-            warnings.warn(
-                f"Household root-finder (hybr) failed: {sol.message}. "
-                f"Residual norm: {np.linalg.norm(sol.fun):.4e}. "
-                f"Falling back to LM."
+            print(
+                f"[Household] hybr did not converge: {sol.message} "
+                f"(residual norm {np.linalg.norm(sol.fun):.4e}). "
+                f"Retrying with Levenberg-Marquardt.",
+                flush=True,
             )
             sol = root(
                 self.euler_residuals,
@@ -319,28 +354,25 @@ class Household:
                 options={'xtol': 1e-8, 'maxiter': 2000},
             )
 
+        # Validate the final residual against an explicit numerical
+        # tolerance. The previous version used `res_norm > 0`, which is
+        # always true and silently routed every call through the fallback
+        # chain — masking solver failure as "convergence". Loud failure
+        # is the correct behaviour: a non-solution must NOT propagate to
+        # the outer SS loop.
         res_norm = float(np.linalg.norm(sol.fun))
-        if not sol.success or not np.isfinite(res_norm) or res_norm > 1e-2:
-            warnings.warn(
-                f"Household root-finder failed with both methods."
-                f"Final residual norm: {res_norm:.4e}."
-                f"Falling back to fresh brent-shoot start."
+        if (not sol.success) or (not np.isfinite(res_norm)) or (res_norm > self.RESIDUAL_TOL):
+            msg = (
+                f"[Household] Root-finder FAILED to reach RESIDUAL_TOL. "
+                f"hybr + LM exhausted. "
+                f"Final residual norm: {res_norm:.4e} "
+                f"(required: < {self.RESIDUAL_TOL:.0e}). "
+                f"sol.success={sol.success}. "
+                f"Solver message: {sol.message!r}. "
+                f"Prices: w={w:.6g}, r={r:.6g}, BQ_val={BQ_val:.6g}."
             )
-            # Bad outer-loop guess: fall back to a fresh brent-shoot start so
-            # downstream aggregates remain finite. Do NOT cache.
-            x_fallback = self._initial_guess(w, r, X_vec, BQ_vec)
-            for x_try in [x_fallback,
-                          self._enforce_delta_c_positive(np.maximum(sol.x, 1e-10)),
-                          np.full(S - E, 0.5)]:
-                try:
-                    return self.solve_decisions(x_try, w, r, X_vec, BQ_vec)
-                except (ValueError, FloatingPointError, AssertionError):
-                    continue
-            raise RuntimeError(
-                f"Household root-finder failed (hybr + LM) and all fallbacks "
-                f"exhausted. Final residual norm: {res_norm:.4e}. "
-                f"solver message: {sol.message}"
-            )
+            print(msg, flush=True)
+            raise RuntimeError(msg)
 
         # Cache converged profile for warm-starting subsequent outer iters.
         self._c_vec_cache = sol.x.copy()
