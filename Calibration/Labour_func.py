@@ -1,7 +1,5 @@
 import numpy as np
 import scipy.optimize as opt
-import matplotlib.pyplot as plt
-from matplotlib.ticker import MultipleLocator
 from scipy.interpolate import PchipInterpolator
 
 from Steady_state_equilibrium.SS_Solver import SteadyStateEquilibrium
@@ -72,7 +70,7 @@ def update_chi_from_foc(c_vec, w, tau_l, n_target, rho, params):
     return chi_s
 
 def calibrate_chi(params, vectors, n_target,
-                  max_iter=50, tol=1e-4, xi_chi=0.9,
+                  max_iter=50, tol=1e-3, xi_chi=0.99,
                   ss_solve_kwargs=None):
     """
     Outer calibration loop. At each iteration:

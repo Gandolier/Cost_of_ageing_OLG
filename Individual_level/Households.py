@@ -164,6 +164,27 @@ class Household:
 
         return np.concatenate([euler_errs, [terminal_err]])
 
+    def _enforce_delta_c_positive(self, c_active: np.ndarray) -> np.ndarray:
+        r"""
+        Enforce $\widehat{\Delta c}_s > 0$ for all $s \in [E, S)$ by
+        clamping the consumption growth rate from below.
+
+        At $h > 0$, feasibility requires $c_s / c_{s-1} > h e^{-g_y}$.
+        The no-habit forward iterator can violate this at old ages where
+        high mortality makes the Euler growth factor very small.  This
+        helper post-processes the profile so that the root-finder starts
+        in the feasible region (§10.1).
+        """
+        h = self.params.get('h', 0.0)
+        if h <= 0:
+            return c_active
+        g_y = self.params['g_y']
+        min_ratio = h * np.exp(-g_y) + 1e-4
+        out = c_active.copy()
+        for k in range(1, len(out)):
+            out[k] = max(out[k], min_ratio * out[k - 1])
+        return out
+
     def _initial_guess(self, w, r, X_vec, BQ_vec) -> np.ndarray:
         r"""
         Build a cold-start initial guess for `c_vec[E:S]`.
@@ -212,7 +233,7 @@ class Household:
                     and f_low * f_high < 0):
                 c1 = brentq(terminal_b, c_low, c_high, xtol=1e-6)
                 c_vec_full = get_consumption_path(c1, r_vec, self.rho, self.params)
-                return c_vec_full[self.E:]
+                return self._enforce_delta_c_positive(c_vec_full[self.E:])
         except (ValueError, FloatingPointError, AssertionError):
             pass
 
@@ -221,7 +242,7 @@ class Household:
         try:
             c_vec_full = get_consumption_path(1.0, r_vec, self.rho, self.params)
             if np.all(np.isfinite(c_vec_full[self.E:])) and np.all(c_vec_full[self.E:] > 0):
-                return c_vec_full[self.E:]
+                return self._enforce_delta_c_positive(c_vec_full[self.E:])
         except (ValueError, FloatingPointError, AssertionError):
             pass
 
@@ -272,6 +293,9 @@ class Household:
         else:
             x0 = self._initial_guess(w, r, X_vec, BQ_vec)
 
+        # Ensure delta_c > 0 for the initial guess at h > 0 (§10.1).
+        x0 = self._enforce_delta_c_positive(np.maximum(x0, 1e-10))
+
         # Primary: Powell hybrid (`hybr`). Robust default per spec.
         sol = root(
             self.euler_residuals,
@@ -297,14 +321,11 @@ class Household:
 
         res_norm = float(np.linalg.norm(sol.fun))
         if not sol.success or not np.isfinite(res_norm) or res_norm > 1e-2:
-            warnings.warn(
+            raise RuntimeError(
                 f"Household root-finder failed with both methods. "
-                f"Final residual norm: {res_norm:.4e}."
+                f"Final residual norm: {res_norm:.4e}. "
+                f"Prices: w={w:.6f}, r={r:.6f}."
             )
-            # Bad outer-loop guess: fall back to a fresh brent-shoot start so
-            # downstream aggregates remain finite. Do NOT cache.
-            x_fallback = self._initial_guess(w, r, X_vec, BQ_vec)
-            return self.solve_decisions(x_fallback, w, r, X_vec, BQ_vec)
 
         # Cache converged profile for warm-starting subsequent outer iters.
         self._c_vec_cache = sol.x.copy()
