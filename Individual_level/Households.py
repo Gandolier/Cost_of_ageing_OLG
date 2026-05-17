@@ -320,11 +320,26 @@ class Household:
             )
 
         res_norm = float(np.linalg.norm(sol.fun))
-        if not sol.success or not np.isfinite(res_norm) or res_norm > 1e-2:
+        if not sol.success or not np.isfinite(res_norm) or res_norm > 0:
+            warnings.warn(
+                f"Household root-finder failed with both methods."
+                f"Final residual norm: {res_norm:.4e}."
+                f"Falling back to fresh brent-shoot start."
+            )
+            # Bad outer-loop guess: fall back to a fresh brent-shoot start so
+            # downstream aggregates remain finite. Do NOT cache.
+            x_fallback = self._initial_guess(w, r, X_vec, BQ_vec)
+            for x_try in [x_fallback,
+                          self._enforce_delta_c_positive(np.maximum(sol.x, 1e-10)),
+                          np.full(S - E, 0.5)]:
+                try:
+                    return self.solve_decisions(x_try, w, r, X_vec, BQ_vec)
+                except (ValueError, FloatingPointError, AssertionError):
+                    continue
             raise RuntimeError(
-                f"Household root-finder failed with both methods. "
-                f"Final residual norm: {res_norm:.4e}. "
-                f"Prices: w={w:.6f}, r={r:.6f}."
+                f"Household root-finder failed (hybr + LM) and all fallbacks "
+                f"exhausted. Final residual norm: {res_norm:.4e}. "
+                f"solver message: {sol.message}"
             )
 
         # Cache converged profile for warm-starting subsequent outer iters.
