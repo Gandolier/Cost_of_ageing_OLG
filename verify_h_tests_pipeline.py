@@ -92,12 +92,12 @@ def main(outpath):
         "I_total": I_norm.loc[2025].values,
     }
 
-    # ---- calibrate chi_s with g_y=.033 (Tests.ipynb 1st cell) ----
+    # ---- calibrate chi_s ----
     params = {
-        "A": 1.4, "alpha": .39, "delta": .03,
+        "A": 1.4, "alpha": .39, "delta": .05,
         "tau_c": 0., "tau_l": .22, "tau_k": 0.,
         "R": 62, "E": 20, "S": 100,
-        "g_n": g_n, "g_y": .033, "beta": .95, "sigma": 1.97,
+        "g_n": g_n, "g_y": .054, "beta": .905, "sigma": 1.97,
         "replacement_rate": .3, "ltilde": 1.,
         "b_ellip": .4309, "upsilon": 1.7648,
         "chi_s": np.ones(100), "h": 0.0,
@@ -105,29 +105,17 @@ def main(outpath):
     solver_params = {
         "r_guess": 0.05, "BQ_guess": 0.2, "tax_guess": .22,
         "policy_mode": "fix_tax", "tax_type": "tau_l",
-        "xi": 0.4, "tol": 1e-2, "max_iter": 5000, "debug": False,
+        "xi": 0.1, "tol": 1e-3, "max_iter": 1000, "debug": True,
     }
     chi_s, _ = calibrate_chi(
         params=params, vectors=vectors, n_target=n_target,
-        max_iter=100, tol=1e+7, xi_chi=0.99,
+        max_iter=100, tol=1e+7, xi_chi=0.9,
         ss_solve_kwargs=solver_params,
     )
 
-    # ---- final SS solve with g_y=.02 (Tests.ipynb final cell) ----
-    params = {
-        "A": 1.4, "alpha": .39, "delta": .03,
-        "tau_c": 0., "tau_l": .22, "tau_k": 0.,
-        "R": 62, "E": 20, "S": 100,
-        "g_n": g_n, "g_y": .02, "beta": .95, "sigma": 1.97,
-        "replacement_rate": .3, "ltilde": 1.,
-        "b_ellip": .4309, "upsilon": 1.7648,
-        "chi_s": chi_s, "h": 0.0,
-    }
-    solver_params = {
-        "r_guess": 0.05, "BQ_guess": 0.2, "tax_guess": .22,
-        "policy_mode": "fix_tax", "tax_type": "tau_l",
-        "xi": 0.05, "tol": 1e-4, "max_iter": 250, "debug": True,
-    }
+    # ---- final SS solve with ----
+    params["chi_s"] = chi_s
+
     steady_state = SteadyStateEquilibrium(params, vectors)
     ss = steady_state.solve(**solver_params)
 

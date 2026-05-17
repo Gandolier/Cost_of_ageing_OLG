@@ -240,10 +240,6 @@ class Household:
             BQ_val: float,
             omega: np.ndarray,
             c_init: np.ndarray = None,
-            # --- Stage-4 backward-compat (consumed/ignored, removed at Stage 5) ---
-            c_init_guess_range: tuple = None,
-            debug_savings: bool = False,
-            debug_prefix: str = "",
     ):
         r"""
         Solve the habit-formation household problem by globally root-finding
@@ -261,11 +257,6 @@ class Household:
         """
         assert len(X_vec) == self.S, f"X_vec length {len(X_vec)} must match S {self.S}"
         assert len(omega) == self.S, f"omega length {len(omega)} must match S {self.S}"
-
-        # `c_init_guess_range`, `debug_savings`, `debug_prefix` are accepted
-        # only to keep the call-site in SS_Solver.py working until Stage 5
-        # cleans it up. They have no effect on the new global solver.
-        _ = (c_init_guess_range, debug_savings, debug_prefix)
 
         E, S = self.E, self.S
         BQ_vec = build_bq_receipt_vec(BQ_val, omega, E, self.params['R'])

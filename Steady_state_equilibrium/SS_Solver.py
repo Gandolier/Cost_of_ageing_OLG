@@ -180,9 +180,6 @@ class SteadyStateEquilibrium:
                 X_vec=X_vec,
                 BQ_val=BQ,
                 omega=self.omega,
-                c_init_guess_range=(1e-5, 50.0),
-                debug_savings=debug and i % 20 == 0,
-                debug_prefix=f"SS iter {i}"
             )
 
             if hh_res is None:
@@ -359,50 +356,26 @@ class SteadyStateEquilibrium:
         plt.show()
 
     def check_euler_errors(self, ss_dict: dict):
-        r"""
-        Validates the Intertemporal Euler Equation.
-        Ref: eq:euler_equations
-        """
+        r"""Validates the Habit-Formation Euler Equation."""
+        from Individual_level.HabitUtility import compute_M_from_c
+
         c_vec = ss_dict['c_vec']
         r = ss_dict['r']
-        tau_k = self.gov.tau_k  # Scalar or vector depending on implementation, usually scalar in SS
-        E = self.params['E']
-
         sigma = self.params['sigma']
         beta = self.params['beta']
         g_y = self.params['g_y']
+        tau_k = self.gov.tau_k
+        E, S = self.params['E'], self.params['S']
 
-        # Marginal Utility
-        # Only check for active agents E to S-1
-        muc = c_vec[E:] ** (-sigma)
-
-        # Effective Interest Rate (Stationary)
+        M_vec = compute_M_from_c(c_vec, self.rho, self.params)
         r_net = r * (1 - tau_k)
 
-        # Euler Error Calculation
-        # LHS: MU_t (ages E to S-1)
-        lhs = muc[:-1]
-
-        # RHS: e^(-sigma*gy) * beta * (1-rho) * (1+r_net) * MU_{t+1}
-        # rho slice: ages E to S-1 correspond to indices E to S-2 in full vector?
-        # Loop in Consumption was range(E, S-1).
-        # indices s: E, E+1, ... S-2.
-        # c_vec indices s and s+1.
-
-        # Here muc is size S-E.
-        # muc[0] is age E+1.
-        # muc[-1] is age S.
-
-        # Equation connects s and s+1.
-        # Check indices:
-        # rho slice: self.rho[E:-1]
-
-        rhs = np.exp(-sigma * g_y) * beta * (1 - self.rho[E:-1]) * (1 + r_net) * muc[1:]
-
+        lhs = M_vec[E:S-1]
+        rhs = beta * (1 - self.rho[E:S-1]) * (1 + r_net) * np.exp(-sigma * g_y) * M_vec[E+1:S]
         euler_errs = lhs - rhs
-        max_err = np.max(np.abs(euler_errs))
 
-        print(f"Euler Equation: Max Abs Error = {max_err:.6e}")
+        max_err = np.max(np.abs(euler_errs))
+        print(f"Habit Euler Equation: Max Abs Error = {max_err:.6e}")
         return euler_errs
 
 
