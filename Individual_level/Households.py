@@ -320,7 +320,7 @@ class Household:
             )
 
         res_norm = float(np.linalg.norm(sol.fun))
-        if not sol.success or not np.isfinite(res_norm) or res_norm > 0:
+        if not sol.success or not np.isfinite(res_norm) or res_norm > 1e-2:
             warnings.warn(
                 f"Household root-finder failed with both methods."
                 f"Final residual norm: {res_norm:.4e}."
