@@ -87,6 +87,7 @@ def calibrate_chi(params, vectors, n_target,
                                xi=0.2, tol=1e-5, max_iter=300)
 
     S = params['S']
+    R = params['R']
     chi_s = np.ones(S)  # initial guess: paper's original specification
     params = dict(params)  # local copy so we can write chi_s in
     params['chi_s'] = chi_s
@@ -111,6 +112,8 @@ def calibrate_chi(params, vectors, n_target,
             rho=vectors['rho'],
             params=params,
         )
+        # Clamp old ages labour to 0
+        #chi_s_new[R:] = 1e6
 
         # Step 4: convergence check on chi_s
         denom = np.maximum(np.abs(chi_s[params['E']:]), 1.0)
@@ -125,6 +128,11 @@ def calibrate_chi(params, vectors, n_target,
         # Damped update — full step (xi_chi=1) tends to work but damp if oscillating
         chi_s = xi_chi * chi_s_new + (1 - xi_chi) * chi_s
         params['chi_s'] = chi_s
+
+        # Update SS solve kwargs with equilibrium values to avoid re-solving
+        ss_solve_kwargs['r_guess'] = result['r']
+        ss_solve_kwargs['BQ_guess'] = result['BQ']
+
         final_result = result
 
     print(f"Calibration did not fully converge in {max_iter} iterations.")

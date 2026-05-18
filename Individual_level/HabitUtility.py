@@ -12,12 +12,13 @@ def compute_delta_c(c_vec: np.ndarray, params: dict) -> np.ndarray:
     """
     h = params['h']
     g_y = params['g_y']
+    c_min = params.get('c_min', 0.0)
     E = params['E']
     S = params['S']
 
     delta_c = np.zeros(S)
     # Vectorised: delta_c[E] uses c_vec[E-1] = 0, automatic
-    delta_c[E:] = c_vec[E:] - h * np.exp(-g_y) * c_vec[E-1:S-1]
+    delta_c[E:] = c_vec[E:] - h * np.exp(-g_y) * c_vec[E-1:S-1] - c_min
     return delta_c
 
 

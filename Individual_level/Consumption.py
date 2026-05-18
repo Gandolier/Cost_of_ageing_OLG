@@ -17,6 +17,7 @@ def get_consumption_path(c_start: float, r_vec: np.array, rho: np.array, p_param
     g_y = p_params['g_y']       # rate of labour augmenting technological growth
     rho = rho                   # mortality probability
     tau_k = p_params['tau_k']   # capital income tax rate
+    c_min = p_params.get('c_min', 0.0)
 
     assert len(rho) == S, f"rho length {len(rho)} must match number of cohorts {S}"
 
@@ -48,6 +49,6 @@ def get_consumption_path(c_start: float, r_vec: np.array, rho: np.array, p_param
         # c_{s+1} = c_s * (beta * (1-rho) * (1+r_net))^(1/sigma) * e^(-g_y)
         growth_rate = (disc_surv * (1 + r_net)) ** growth_exponent
 
-        c_vec[s + 1] = c_vec[s] * growth_rate * stat_factor
+        c_vec[s + 1] = c_min + c_vec[s] * growth_rate * stat_factor
 
     return c_vec

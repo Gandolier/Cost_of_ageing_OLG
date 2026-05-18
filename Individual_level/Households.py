@@ -74,7 +74,7 @@ class Household:
     # household solution does not introduce spurious noise into the outer
     # convergence test. With outer tol typically 1e-3 .. 1e-4, 1e-6 here
     # gives ample headroom.
-    RESIDUAL_TOL = 1e-1
+    RESIDUAL_TOL = 1e-2
 
     def __init__(self, p_params: dict, rho: np.array):
         r"""
@@ -199,13 +199,15 @@ class Household:
         guess, not to the solver's returned solution.
         """
         h = self.params.get('h', 0.0)
-        if h <= 0:
+        c_min = self.params.get('c_min', 0.0)
+        if h <= 0 and c_min <= 0:
             return c_active
         g_y = self.params['g_y']
         min_ratio = h * np.exp(-g_y) + 1e-4
         out = c_active.copy()
+        out[0] = max(out[0], c_min+1e-4)
         for k in range(1, len(out)):
-            out[k] = max(out[k], min_ratio * out[k - 1])
+            out[k] = max(out[k], min_ratio * out[k - 1] + c_min + 1e-4)
         return out
 
     def _initial_guess(self, w, r, X_vec, BQ_vec) -> np.ndarray:
@@ -327,36 +329,22 @@ class Household:
         # Ensure delta_c > 0 for the initial guess at h > 0 (§10.1).
         x0 = self._enforce_delta_c_positive(np.maximum(x0, 1e-10))
 
+        from Individual_level.HabitUtility import compute_delta_c
+        delta_c0 = compute_delta_c(np.concatenate([np.zeros(self.E), x0]), self.params)
+        print(f"[DIAG] c_min={self.params.get('c_min', 0.0):.4f}, "
+              f"x0 min={x0.min():.4f}, x0 max={x0.max():.4f}, "
+              f"Δc0 min={delta_c0[self.E:].min():.4e}, "
+              f"residual at x0 norm={np.linalg.norm(self.euler_residuals(x0, w, r, X_vec, BQ_vec)):.4e}",
+              flush=True)
+
         # Primary: Powell hybrid (`hybr`). Robust default per spec.
         sol = root(
             self.euler_residuals,
             x0,
             args=(w, r, X_vec, BQ_vec),
             method='hybr',
-            options={'xtol': 1e-8, 'maxfev': 2000},
+            options={'xtol': 1e-8, 'maxfev': 5000},
         )
-
-        # at the very start of solve_steady_state
-        # print(f"[H] RESIDUAL_TOL at runtime = {self.RESIDUAL_TOL}", flush=True)
-        # print(f"[H] h = {self.params.get('h')}, chi_s[E:E+3] = {self.params['chi_s'][self.E:self.E + 3]}", flush=True)
-        #
-        # # right after building x0
-        # print(
-        #     f"[H] x0 source: {'cache' if c_init is not None else 'cached_warm' if self._c_vec_cache is not None else 'cold'}",
-        #     flush=True)
-        # print(f"[H] x0 stats: min={x0.min():.3e}, max={x0.max():.3e}, idx_min={int(np.argmin(x0))}", flush=True)
-        # res0 = self.euler_residuals(x0, w, r, X_vec, BQ_vec)
-        # print(f"[H] residual norm at x0 = {np.linalg.norm(res0):.3e}, max abs entry = {np.max(np.abs(res0)):.3e}",
-        #       flush=True)
-        #
-        # # in _initial_guess, print which branch was taken
-        # # in solve_steady_state, after hybr:
-        # print(f"[H] hybr: success={sol.success}, |fun|={np.linalg.norm(sol.fun):.3e}, x_min={sol.x.min():.3e}",
-        #       flush=True)
-        #
-        # # after LM:
-        # print(f"[H] LM: success={sol.success}, |fun|={np.linalg.norm(sol.fun):.3e}, x_min={sol.x.min():.3e}",
-        #       flush=True)
 
         # If hybr fails to claim success, retry on the SAME problem with
         # LM. This is a legitimate solver retry — it is NOT a silent
@@ -373,7 +361,7 @@ class Household:
                 x0,
                 args=(w, r, X_vec, BQ_vec),
                 method='lm',
-                options={'xtol': 1e-8, 'maxiter': 2000},
+                options={'xtol': 1e-8, 'maxiter': 5000},
             )
 
         # Validate the final residual against an explicit numerical
