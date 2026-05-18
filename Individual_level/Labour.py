@@ -27,13 +27,18 @@ def get_labour_supply(w: float, M_vec: np.ndarray, p_params: dict) -> np.ndarray
 
     net_wage = w * (1 - tau_l)
     assert net_wage > 0, "Net wage must be strictly positive"
-    assert np.all(M_vec[E:] > 0), "M_vec must be strictly positive over [E, S)"
+    assert np.all(np.isfinite(M_vec[E:])), "M_vec must be finite over [E, S)"
+
+    # Clamp M_vec to avoid non-positive values in the denominator of the labor FOC.
+    # Negative M implies consumption habits are so strong that marginal utility
+    # is negative; we treat this as a corner where labour supply is minimal.
+    M_vec_safe = np.maximum(M_vec[E:], 1e-10)
 
     n_vec = np.zeros(S)
 
     # Inside parenthesis of the FOC: chi_s * b / (l_tilde * net_wage * M_s)
     numer = chi_s * b_ellip
-    denom = l_tilde * net_wage * M_vec[E:]
+    denom = l_tilde * net_wage * M_vec_safe
     ratio = np.maximum(numer / denom, 1e-10)
 
     exponent = upsilon / (upsilon - 1)

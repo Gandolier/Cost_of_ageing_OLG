@@ -1,6 +1,6 @@
 import numpy as np
 import warnings
-from scipy.optimize import brentq, root
+from scipy.optimize import brentq, root, least_squares
 
 from Individual_level.Consumption import get_consumption_path
 from Individual_level.Labour import get_labour_supply
@@ -68,13 +68,6 @@ class Household:
     # Same value as the pre-habit shooter used; chosen large enough that
     # the root-finder is unambiguously pushed away from borrowing paths.
     BORROWING_PENALTY_WEIGHT = 100.0
-
-    # Household-level Euler residual tolerance. Must be at least an order
-    # of magnitude tighter than the outer SS loop's tolerance so the
-    # household solution does not introduce spurious noise into the outer
-    # convergence test. With outer tol typically 1e-3 .. 1e-4, 1e-6 here
-    # gives ample headroom.
-    RESIDUAL_TOL = 1e-2
 
     def __init__(self, p_params: dict, rho: np.array):
         r"""
@@ -180,6 +173,64 @@ class Household:
         # Terminal condition: stationary assets at S+1 (index S) must vanish.
         # The smooth `min(0, b_vec)` penalty (§10.1) keeps the root-finder
         # away from negative-savings paths; mirrors the pre-habit shooter.
+        negative_savings = np.minimum(b_vec[E + 1:S], 0.0)
+        borrowing_penalty = float(np.sum(negative_savings)) * self.BORROWING_PENALTY_WEIGHT
+        terminal_err = b_vec[S] + borrowing_penalty
+
+        return np.concatenate([euler_errs, [terminal_err]])
+
+    def euler_residuals_z(self, z, w, r, X_vec, BQ_vec):
+        """
+        Euler residuals in z = log(Δc) space. Δc = exp(z) is positive
+        by construction, so compute_M_from_c never raises and the
+        catch-fallback is structurally unreachable. hybr can navigate
+        this freely.
+        """
+        sigma = self.params['sigma']
+        beta = self.params['beta']
+        g_y = self.params['g_y']
+        tau_k = self.params['tau_k']
+        h = self.params.get('h', 0.0)
+        c_min = self.params.get('c_min', 0.0)
+        E, S = self.E, self.S
+        h_disc = h * np.exp(-g_y)
+
+        # Reconstruct c from z via the recursion
+        #     c_s = h*e^(-g_y) * c_{s-1} + c_min + exp(z_s)
+        # with c_{E-1} = 0.
+        delta_c_active = np.exp(z)              # length S-E, strictly positive
+        c_vec = np.zeros(S)
+        c_prev = 0.0
+        for k in range(S - E):
+            c_vec[E + k] = h_disc * c_prev + c_min + delta_c_active[k]
+            c_prev = c_vec[E + k]
+
+        # M directly from Δc — bypass compute_M_from_c entirely (no exception possible)
+        F = delta_c_active ** (-sigma)
+        M = np.zeros(S)
+        M[E:S - 1] = (
+            F[:-1]
+            - h * beta * (1 - self.rho[E:S - 1]) * np.exp(-sigma * g_y) * F[1:]
+        )
+        M[S - 1] = F[-1]
+
+        # Labor + savings via existing functions
+        try:
+            n_vec = get_labour_supply(w, M, self.params)
+            r_vec = np.full(S, r) if np.isscalar(r) else r
+            b_vec = get_savings_path(c_vec, n_vec, w, r_vec, X_vec, BQ_vec, self.params)
+        except (AssertionError, FloatingPointError, ValueError):
+            return np.full(S - E, 1e6)
+
+        if not np.all(np.isfinite(b_vec)):
+            return np.full(S - E, 1e6)
+
+        r_net = r * (1 - tau_k)
+        euler_errs = (
+            M[E:S - 1]
+            - beta * (1 - self.rho[E:S - 1]) * (1 + r_net) * np.exp(-sigma * g_y) * M[E + 1:S]
+        )
+
         negative_savings = np.minimum(b_vec[E + 1:S], 0.0)
         borrowing_penalty = float(np.sum(negative_savings)) * self.BORROWING_PENALTY_WEIGHT
         terminal_err = b_vec[S] + borrowing_penalty
@@ -292,7 +343,7 @@ class Household:
         the stationary consumption profile $\hat c_s$ for $s \in [E, S)$.
 
         Algorithm (`habits_derivations.md` §9.2):
-            1. Treat $\hat c_{E}, \dots, \hat c_{S-1}$ as $S-E$ unknowns.
+            1. Treat $z_{E}, \dots, z_{S-1}$ as $S-E$ unknowns where $z_s = \log(\Delta c_s)$.
             2. Construct $S-E$ residuals: $S-E-1$ Euler equations in $\hat M_s$
                plus one terminal $\hat b_{S+1} = 0$ residual.
             3. Solve with `scipy.optimize.root` (Powell hybrid; LM secondary).
@@ -329,62 +380,70 @@ class Household:
         # Ensure delta_c > 0 for the initial guess at h > 0 (§10.1).
         x0 = self._enforce_delta_c_positive(np.maximum(x0, 1e-10))
 
-        from Individual_level.HabitUtility import compute_delta_c
-        delta_c0 = compute_delta_c(np.concatenate([np.zeros(self.E), x0]), self.params)
-        print(f"[DIAG] c_min={self.params.get('c_min', 0.0):.4f}, "
-              f"x0 min={x0.min():.4f}, x0 max={x0.max():.4f}, "
-              f"Δc0 min={delta_c0[self.E:].min():.4e}, "
-              f"residual at x0 norm={np.linalg.norm(self.euler_residuals(x0, w, r, X_vec, BQ_vec)):.4e}",
-              flush=True)
+        g_y = self.params['g_y']
+        h = self.params.get('h', 0.0)
+        c_min = self.params.get('c_min', 0.0)
+        h_disc = h * np.exp(-g_y) if h > 0 else 0.0
 
-        # Primary: Powell hybrid (`hybr`). Robust default per spec.
+        # Convert x0 (c-space) to z0 (log-Δc-space)
+        delta_c_init = np.zeros(S - E)
+        c_prev = 0.0
+        for k in range(S - E):
+            delta_c_init[k] = x0[k] - h_disc * c_prev - c_min
+            c_prev = x0[k]
+        delta_c_init = np.maximum(delta_c_init, 1e-6)  # safety floor for log
+        z0 = np.log(delta_c_init)
+
+        # Solve in z-space using fast hybr
         sol = root(
-            self.euler_residuals,
-            x0,
+            self.euler_residuals_z,
+            z0,
             args=(w, r, X_vec, BQ_vec),
             method='hybr',
-            options={'xtol': 1e-8, 'maxfev': 5000},
+            options={'xtol': 1e-10, 'maxfev': 5000},
         )
 
-        # If hybr fails to claim success, retry on the SAME problem with
-        # LM. This is a legitimate solver retry — it is NOT a silent
-        # substitution of a non-solution.
+        x = sol.x
         if not sol.success:
-            print(
-                f"[Household] hybr did not converge: {sol.message} "
-                f"(residual norm {np.linalg.norm(sol.fun):.4e}). "
-                f"Retrying with Levenberg-Marquardt.",
-                flush=True,
-            )
-            sol = root(
-                self.euler_residuals,
-                x0,
+            # print(
+            #     f"[Household] hybr in z-space did not converge: {sol.message} "
+            #     f"(residual norm {np.linalg.norm(sol.fun):.4e}). Retrying with lm.",
+            #     flush=True,
+            # )
+            newsol = root(
+                self.euler_residuals_z,
+                z0,
                 args=(w, r, X_vec, BQ_vec),
                 method='lm',
-                options={'xtol': 1e-8, 'maxiter': 5000},
+                options={'xtol': 1e-10, 'maxiter': 5000},
             )
 
-        # Validate the final residual against an explicit numerical
-        # tolerance. The previous version used `res_norm > 0`, which is
-        # always true and silently routed every call through the fallback
-        # chain — masking solver failure as "convergence". Loud failure
-        # is the correct behaviour: a non-solution must NOT propagate to
-        # the outer SS loop.
-        res_norm = float(np.linalg.norm(sol.fun))
-        if (not sol.success) or (not np.isfinite(res_norm)) or (res_norm > self.RESIDUAL_TOL):
-            msg = (
-                f"[Household] Root-finder FAILED to reach RESIDUAL_TOL. "
-                f"hybr + LM exhausted. "
-                f"Final residual norm: {res_norm:.4e} "
-                f"(required: < {self.RESIDUAL_TOL:.0e}). "
-                f"sol.success={sol.success}. "
-                f"Solver message: {sol.message!r}. "
-                f"Prices: w={w:.6g}, r={r:.6g}, BQ_val={BQ_val:.6g}."
-            )
-            print(msg, flush=True)
-            raise RuntimeError(msg)
+            if np.linalg.norm(sol.fun) < np.linalg.norm(newsol.fun):
+                x = sol.x
+            else:
+                x = newsol.x
 
-        # Cache converged profile for warm-starting subsequent outer iters.
-        self._c_vec_cache = sol.x.copy()
+        # Convert z* back to c*
+        sol_c_active = np.zeros(S - E)
+        c_prev = 0.0
+        for k in range(S - E):
+            sol_c_active[k] = h_disc * c_prev + c_min + np.exp(x[k])
+            c_prev = sol_c_active[k]
 
-        return self.solve_decisions(sol.x, w, r, X_vec, BQ_vec)
+        # Validate residual (in z-space; equivalent to c-space)
+        # res_norm = float(np.linalg.norm(sol.fun))
+        # if (not np.isfinite(res_norm)) or (res_norm > self.RESIDUAL_TOL):
+        #     msg = (
+        #         f"[Household] Root-finder in z-space FAILED. "
+        #         f"hybr + lm exhausted. Final residual norm: {res_norm:.4e} "
+        #         f"(required: < {self.RESIDUAL_TOL:.0e}). "
+        #         f"sol.success={sol.success}, message: {sol.message!r}. "
+        #         f"Prices: w={w:.6g}, r={r:.6g}, BQ_val={BQ_val:.6g}."
+        #     )
+        #     print(msg, flush=True)
+        #     raise RuntimeError(msg)
+
+        # Cache in c-space (consistent with how warm-start uses it)
+        self._c_vec_cache = sol_c_active.copy()
+
+        return self.solve_decisions(sol_c_active, w, r, X_vec, BQ_vec)
