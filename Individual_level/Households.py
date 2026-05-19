@@ -94,6 +94,7 @@ class Household:
             r: float,
             X_vec: np.ndarray,
             BQ_vec: np.ndarray,
+            delta_c=None,
     ):
         r"""
         Given a full stationary consumption profile (`c_vec_active` of length
@@ -113,8 +114,11 @@ class Household:
         c_vec = np.zeros(self.S)
         c_vec[self.E:] = c_vec_active
 
-        # Effective marginal utility (habit-aware; at h=0 reduces to c^(-sigma))
-        M_vec = compute_M_from_c(c_vec, self.rho, self.params)
+        if delta_c is not None:
+            from Individual_level.HabitUtility import compute_M_from_delta_c
+            M_vec = compute_M_from_delta_c(delta_c, self.rho, self.params)
+        else:
+            M_vec = compute_M_from_c(c_vec, self.rho, self.params)  # legacy / h=0
 
         # Labour Supply (intratemporal FOC, driven by M_vec)
         n_vec = get_labour_supply(w, M_vec, self.params)
@@ -423,27 +427,15 @@ class Household:
             else:
                 x = newsol.x
 
-        # Convert z* back to c*
+        # Δc by construction; clamp away from exact zero in case any x[k] < ~-745
+        delta_c = np.zeros(self.S)
+        delta_c[self.E:] = np.maximum(np.exp(x), 1e-30)
+
         sol_c_active = np.zeros(S - E)
         c_prev = 0.0
         for k in range(S - E):
-            sol_c_active[k] = h_disc * c_prev + c_min + np.exp(x[k])
+            sol_c_active[k] = h_disc * c_prev + c_min + delta_c[E + k]
             c_prev = sol_c_active[k]
 
-        # Validate residual (in z-space; equivalent to c-space)
-        # res_norm = float(np.linalg.norm(sol.fun))
-        # if (not np.isfinite(res_norm)) or (res_norm > self.RESIDUAL_TOL):
-        #     msg = (
-        #         f"[Household] Root-finder in z-space FAILED. "
-        #         f"hybr + lm exhausted. Final residual norm: {res_norm:.4e} "
-        #         f"(required: < {self.RESIDUAL_TOL:.0e}). "
-        #         f"sol.success={sol.success}, message: {sol.message!r}. "
-        #         f"Prices: w={w:.6g}, r={r:.6g}, BQ_val={BQ_val:.6g}."
-        #     )
-        #     print(msg, flush=True)
-        #     raise RuntimeError(msg)
-
-        # Cache in c-space (consistent with how warm-start uses it)
         self._c_vec_cache = sol_c_active.copy()
-
-        return self.solve_decisions(sol_c_active, w, r, X_vec, BQ_vec)
+        return self.solve_decisions(sol_c_active, w, r, X_vec, BQ_vec, delta_c=delta_c)

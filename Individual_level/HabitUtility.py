@@ -56,3 +56,22 @@ def compute_M_from_c(c_vec: np.ndarray, rho: np.ndarray, params: dict) -> np.nda
     # Boundary: no future contribution
     M[S-1] = F[S-1]
     return M
+
+
+def compute_M_from_delta_c(delta_c, rho, params):
+    """Same as compute_M_from_c but takes Δc directly, sidestepping
+    the catastrophic cancellation when Δc is re-derived from a
+    reconstructed c_vec."""
+    sigma, beta, g_y = params['sigma'], params['beta'], params['g_y']
+    h, E, S = params['h'], params['E'], params['S']
+
+    if np.any(delta_c[E:] <= 0):
+        bad = np.where(delta_c[E:] <= 0)[0] + E
+        raise ValueError(f"Δc non-positive at ages {bad.tolist()}.")
+
+    F = np.zeros(S)
+    F[E:] = delta_c[E:] ** (-sigma)
+    M = np.zeros(S)
+    M[E:S-1] = F[E:S-1] - h*beta*(1-rho[E:S-1])*np.exp(-sigma*g_y)*F[E+1:S]
+    M[S-1] = F[S-1]
+    return M
