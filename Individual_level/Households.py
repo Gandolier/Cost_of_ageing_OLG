@@ -230,14 +230,25 @@ class Household:
             return np.full(S - E, 1e6)
 
         r_net = r * (1 - tau_k)
-        euler_errs = (
+
+        # Raw Euler residuals
+        euler_raw = (
             M[E:S - 1]
             - beta * (1 - self.rho[E:S - 1]) * (1 + r_net) * np.exp(-sigma * g_y) * M[E + 1:S]
         )
+        # Rescale by local M magnitude. At a true root the numerator is exactly
+        # zero, so dividing by a positive scale does NOT move the solution — it
+        # only equalises the conditioning across ages so the solver weighs the
+        # old-age Euler and the terminal budget comparably.
+        euler_scale = np.maximum(np.maximum(np.abs(M[E:S - 1]), np.abs(M[E + 1:S])), 1.0)
+        euler_errs = euler_raw / euler_scale
 
+        # Terminal budget, rescaled to the asset scale so it's no longer invisible
         negative_savings = np.minimum(b_vec[E + 1:S], 0.0)
         borrowing_penalty = float(np.sum(negative_savings)) * self.BORROWING_PENALTY_WEIGHT
-        terminal_err = b_vec[S] + borrowing_penalty
+        terminal_raw = b_vec[S] + borrowing_penalty
+        b_scale = max(float(np.max(np.abs(b_vec[E:S]))), 1.0)
+        terminal_err = terminal_raw / b_scale
 
         return np.concatenate([euler_errs, [terminal_err]])
 
