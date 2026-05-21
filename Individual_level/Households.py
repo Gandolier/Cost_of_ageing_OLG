@@ -429,7 +429,7 @@ class Household:
 
         # Δc by construction; clamp away from exact zero in case any x[k] < ~-745
         delta_c = np.zeros(self.S)
-        delta_c[self.E:] = np.maximum(np.exp(x), 1e-30)
+        delta_c[self.E:] = np.clip(np.exp(x), 1e-10, 1e2)
 
         sol_c_active = np.zeros(S - E)
         c_prev = 0.0

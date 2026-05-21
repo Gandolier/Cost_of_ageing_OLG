@@ -103,6 +103,10 @@ def calibrate_chi(params, vectors, n_target,
         if result is None:
             raise RuntimeError(f"Calibration iter {k}: SS failed to converge.")
 
+        # Sync c_min with the equilibrium wage so update_chi_from_foc
+        # uses the same c_min that the SS solve converged with.
+        params['c_min'] = params.get('c_min_wage_share', 0.44) * result['w']
+
         # Step 2-3: closed-form chi_s update
         chi_s_new = update_chi_from_foc(
             c_vec=result['c_vec'],
@@ -113,7 +117,7 @@ def calibrate_chi(params, vectors, n_target,
             params=params,
         )
         # Clamp old ages labour to 0
-        #chi_s_new[R:] = 1e6
+        chi_s_new = np.clip(chi_s_new, 1.0, 1e6)
 
         # Step 4: convergence check on chi_s
         denom = np.maximum(np.abs(chi_s[params['E']:]), 1.0)

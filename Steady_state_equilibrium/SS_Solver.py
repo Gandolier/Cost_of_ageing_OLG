@@ -148,6 +148,12 @@ class SteadyStateEquilibrium:
             # 1. Factor Prices (FPF)
             w = self.firm.get_wage_from_r(r)
 
+            # 1b. Endogenous subsistence: c_min scales with prevailing wage.
+            # self.params is the same dict object as self.household.params
+            # (shared by reference), so this update is visible to the
+            # household problem on this and all subsequent calls.
+            self.params['c_min'] = self.params.get('c_min_wage_share', 0.44) * w
+
             # Determine Fiscal State variables
             if policy_mode == 'fix_tax':
                 # X is the variable being solved for
