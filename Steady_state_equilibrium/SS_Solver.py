@@ -38,7 +38,9 @@ class SteadyStateEquilibrium:
         self.i_rate = vectors['i_rate']         # size S x 1 vector of net migration rates by age
         self.I_total = vectors['I_total']       # size 1 x T vector of total net migration by time
         self.g_n = params['g_n']                # g_n = N_t+1 / N_t - 1
+        
         self.S = params['S']
+        self.R = params['R']
 
         # Initialize Economic Agents
         self.household = Household(self.params, self.rho)
@@ -94,8 +96,6 @@ class SteadyStateEquilibrium:
         :return: Dictionary containing all Steady State variables
         """
         self._validate_solve_inputs(r_guess, BQ_guess, tax_guess, policy_mode, tax_type, xi, max_iter)
-
-        print(f"Starting Steady State Solver (Mode: {policy_mode}, Tax: {tax_type})...")
 
         # Current guesses
         r = r_guess
@@ -282,7 +282,12 @@ class SteadyStateEquilibrium:
             }
 
             if error < tol:
-                print(f"Converged in {i} iterations.")
+                print(f"Converged in {i} iterations, Error={error:.6f}")
+                print(f"  guesses: r={r:.4f} | BQ={BQ:.4f} | PolVar={curr_policy_var:.4f}")
+                print(f"  implied: r_new={r_new:.4f} | BQ_new={BQ_new:.4f} | policy_new={policy_new:.4f}")
+                print(f"  aggregates: Y={Y_new:.4f} | K={K_new:.4f} | L={L_new:.4f} | C={C_agg:.4f} | w={w:.4f}\n")
+                print(f"  b_R={b_vec[self.R]:.4f}, b_S={b_vec[self.S]:.4f}, c_old={c_vec[self.S-1]:.4f}\n")
+                
                 break
 
             # 8. Relaxation

@@ -449,4 +449,14 @@ class Household:
             c_prev = sol_c_active[k]
 
         self._c_vec_cache = sol_c_active.copy()
-        return self.solve_decisions(sol_c_active, w, r, X_vec, BQ_vec, delta_c=delta_c)
+
+        c_vec, n_vec, b_vec = self.solve_decisions(sol_c_active, w, r, X_vec, BQ_vec)
+        res = self.euler_residuals_z(sol.x, w, r, X_vec, BQ_vec)   # or euler_residuals in c-space
+        R = self.params['R']
+
+        # print(f"[DIAG] max|euler|={np.max(np.abs(res[:-1])):.3e}, "
+            # f"terminal={res[-1]:.3e}, b_S={b_vec[self.S]:.4f}, "
+            # f"b_R={b_vec[R]:.4f}, c_old={c_vec[self.S-1]:.4f}", flush=True)
+        # print(25*'---')
+        
+        return c_vec, n_vec, b_vec

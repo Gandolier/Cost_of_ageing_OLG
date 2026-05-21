@@ -116,14 +116,15 @@ def calibrate_chi(params, vectors, n_target,
             rho=vectors['rho'],
             params=params,
         )
-        # Clamp old ages labour to 0
-        chi_s_new = np.clip(chi_s_new, 1.0, 1e6)
+        # Clamp disutility of labour sensitivity
+        chi_s_new = np.clip(chi_s_new, 1e-8, 1e6)
 
         # Step 4: convergence check on chi_s
         denom = np.maximum(np.abs(chi_s[params['E']:]), 1.0)
         err = np.max(np.abs(chi_s_new[params['E']:] - chi_s[params['E']:]) / denom)
         print(f"Chi-iter {k}: max |dchi| = {err:.3e}, "
               f"r = {result['r']:.4f}, w = {result['w']:.4f}")
+        print(25*"---")
 
         if err < tol:
             params['chi_s'] = chi_s_new
