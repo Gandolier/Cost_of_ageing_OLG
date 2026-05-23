@@ -49,6 +49,6 @@ def get_consumption_path(c_start: float, r_vec: np.array, rho: np.array, p_param
         # c_{s+1} = c_s * (beta * (1-rho) * (1+r_net))^(1/sigma) * e^(-g_y)
         growth_rate = (disc_surv * (1 + r_net)) ** growth_exponent
 
-        c_vec[s + 1] = c_min + c_vec[s] * growth_rate * stat_factor
+        c_vec[s + 1] = c_min + (c_vec[s] - c_min) * growth_rate * stat_factor
 
     return c_vec

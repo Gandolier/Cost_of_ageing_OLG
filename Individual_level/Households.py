@@ -67,7 +67,7 @@ class Household:
 
     # Same value as the pre-habit shooter used; chosen large enough that
     # the root-finder is unambiguously pushed away from borrowing paths.
-    BORROWING_PENALTY_WEIGHT = 100.0
+    BORROWING_PENALTY_WEIGHT = 100
 
     def __init__(self, p_params: dict, rho: np.array):
         r"""

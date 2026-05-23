@@ -255,11 +255,12 @@ class SteadyStateEquilibrium:
             # Prepare result dictionary
             C_agg = self.aggregator.get_aggregate_consumption(c_vec)
 
-            if debug and i % 20 == 0:
+            if debug and i % 50 == 0:
                 print(f"Iter {i}: Error={error:.6f}")
                 print(f"  guesses: r={r:.4f} | BQ={BQ:.4f} | PolVar={curr_policy_var:.4f}")
                 print(f"  implied: r_new={r_new:.4f} | BQ_new={BQ_new:.4f} | policy_new={policy_new:.4f}")
                 print(f"  aggregates: Y={Y_new:.4f} | K={K_new:.4f} | L={L_new:.4f} | C={C_agg:.4f} | w={w:.4f}")
+                print(f"  b_R={b_vec[self.R]:.4f}, b_S={b_vec[self.S]:.4f}, c_old={c_vec[self.S-1]:.4f}\n")
                 print(25*"---")
                 #break
                 

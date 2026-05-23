@@ -135,8 +135,8 @@ def calibrate_chi(params, vectors, n_target,
         params['chi_s'] = chi_s
 
         # Update SS solve kwargs with equilibrium values to avoid re-solving
-        ss_solve_kwargs['r_guess'] = result['r']
-        ss_solve_kwargs['BQ_guess'] = result['BQ']
+        #ss_solve_kwargs['r_guess'] = result['r']
+        #ss_solve_kwargs['BQ_guess'] = result['BQ']
 
         final_result = result
 
