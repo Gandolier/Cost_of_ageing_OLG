@@ -243,12 +243,15 @@ class Household:
         euler_scale = np.maximum(np.maximum(np.abs(M[E:S - 1]), np.abs(M[E + 1:S])), 1.0)
         euler_errs = euler_raw / euler_scale
 
-        # Terminal budget, rescaled to the asset scale so it's no longer invisible
+        # Negative savings (borrowing) penalty. Allows solver to explore away borrowing solutions
         negative_savings = np.minimum(b_vec[E + 1:S], 0.0)
         borrowing_penalty = float(np.sum(negative_savings)) * self.BORROWING_PENALTY_WEIGHT
-        terminal_raw = b_vec[S] + borrowing_penalty
-        b_scale = max(float(np.max(np.abs(b_vec[E:S]))), 1.0)
-        terminal_err = terminal_raw / b_scale
+
+        # Terminal: rescale by CONSUMPTION scale, NOT asset scale.
+        # "b_S unspent" is naturally measured in years-of-consumption; dividing by
+        # mean consumption keeps it O(10-50) so the solver MUST pin the level.
+        c_scale = max(float(np.mean(c_vec[E:])), 1.0)
+        terminal_err = (b_vec[S] + borrowing_penalty) / c_scale
 
         return np.concatenate([euler_errs, [terminal_err]])
 

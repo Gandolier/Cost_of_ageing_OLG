@@ -117,7 +117,7 @@ def calibrate_chi(params, vectors, n_target,
             params=params,
         )
         # Clamp disutility of labour sensitivity
-        chi_s_new = np.clip(chi_s_new, 1e-8, 1e6)
+        chi_s_new = np.clip(chi_s_new, 1e-8, 1e12)
 
         # Step 4: convergence check on chi_s
         denom = np.maximum(np.abs(chi_s[params['E']:]), 1.0)
