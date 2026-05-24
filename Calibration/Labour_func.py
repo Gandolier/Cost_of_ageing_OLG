@@ -105,7 +105,7 @@ def calibrate_chi(params, vectors, n_target,
 
         # Sync c_min with the equilibrium wage so update_chi_from_foc
         # uses the same c_min that the SS solve converged with.
-        params['c_min'] = params.get('c_min_wage_share', 0.44) * result['w']
+        #params['c_min'] = params.get('c_min_wage_share', 0.44) * result['w']
 
         # Step 2-3: closed-form chi_s update
         chi_s_new = update_chi_from_foc(
@@ -135,8 +135,8 @@ def calibrate_chi(params, vectors, n_target,
         params['chi_s'] = chi_s
 
         # Update SS solve kwargs with equilibrium values to avoid re-solving
-        #ss_solve_kwargs['r_guess'] = result['r']
-        #ss_solve_kwargs['BQ_guess'] = result['BQ']
+        ss_solve_kwargs['r_guess'] = result['r']
+        ss_solve_kwargs['BQ_guess'] = result['BQ']
 
         final_result = result
 
@@ -247,3 +247,33 @@ def build_target_labour_profile(
     if return_components:
         return n_target, ep_profile, hours_profile
     return n_target
+
+
+def build_cons_profile(raw_mids=None, raw_vals=None):
+    from scipy.interpolate import PchipInterpolator
+    """Interpolate via PCHIP after augmenting with sentinel anchors.
+
+    right_tail_zero=True: anchor the right tail at zero (suited to E/P).
+    right_tail_zero=False: anchor the right tail at the last observed
+    value (suited to hours-conditional-on-employment).
+    """
+    full_s = np.arange(100)
+
+    if raw_mids is None:
+        raw_mids = [17, 22, 27, 32, 37, 42, 47, 52, 57, 62, 67, 72, 77, 82, 85]
+    if raw_vals is None:
+        raw_vals = [23.8, 36.8, 47.2, 51.6, 53., 51.3, 47., 42.5, 37.4, 31.7, 27.4, 25., 23.9, 24.6, 25.1]
+
+    # Augment with anchor points; PCHIP will smoothly interpolate across them
+    mids = [raw_mids[0]-1] + raw_mids
+    vals = [raw_vals[0]] + raw_vals
+
+    # Hold flat at the last observed value to the end of the age range
+    mids.append(90)
+    vals.append(raw_vals[-1])
+
+    print(np.asarray(mids, dtype=float), np.asarray(vals, dtype=float))
+    interp = PchipInterpolator(np.asarray(mids, dtype=float),
+                                np.asarray(vals, dtype=float))
+    out = interp(full_s)
+    return np.maximum(out, 0.0)  # clamp tiny negative artefacts
