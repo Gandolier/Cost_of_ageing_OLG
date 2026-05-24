@@ -151,7 +151,7 @@ class Household:
         escape the infeasible region (§10.1).
         """
         sigma = self.params['sigma']
-        beta = self.params['beta']
+        beta = self.params['beta_s']
         g_y = self.params['g_y']
         tau_k = self.params['tau_k']
         E, S = self.E, self.S
@@ -170,7 +170,7 @@ class Household:
         # Euler residuals at s = E, ..., S-2 (length S-E-1).
         euler_errs = (
             M_vec[E:S - 1]
-            - beta * (1 - self.rho[E:S - 1]) * (1 + r_net)
+            - beta[E:S - 1] * (1 - self.rho[E:S - 1]) * (1 + r_net)
             * np.exp(-sigma * g_y) * M_vec[E + 1:S]
         )
 
@@ -191,7 +191,7 @@ class Household:
         this freely.
         """
         sigma = self.params['sigma']
-        beta = self.params['beta']
+        beta = self.params['beta_s']
         g_y = self.params['g_y']
         tau_k = self.params['tau_k']
         h = self.params.get('h', 0.0)
@@ -214,7 +214,7 @@ class Household:
         M = np.zeros(S)
         M[E:S - 1] = (
             F[:-1]
-            - h * beta * (1 - self.rho[E:S - 1]) * np.exp(-sigma * g_y) * F[1:]
+            - h * beta[E:S - 1] * (1 - self.rho[E:S - 1]) * np.exp(-sigma * g_y) * F[1:]
         )
         M[S - 1] = F[-1]
 
@@ -234,7 +234,7 @@ class Household:
         # Raw Euler residuals
         euler_raw = (
             M[E:S - 1]
-            - beta * (1 - self.rho[E:S - 1]) * (1 + r_net) * np.exp(-sigma * g_y) * M[E + 1:S]
+            - beta[E:S - 1] * (1 - self.rho[E:S - 1]) * (1 + r_net) * np.exp(-sigma * g_y) * M[E + 1:S]
         )
         # Rescale by local M magnitude. At a true root the numerator is exactly
         # zero, so dividing by a positive scale does NOT move the solution — it

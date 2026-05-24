@@ -32,7 +32,7 @@ def compute_M_from_c(c_vec: np.ndarray, rho: np.ndarray, params: dict) -> np.nda
     Raises ValueError if Delta_c[s] <= 0 for any s >= E (habit too strong / bad c profile).
     """
     h = params['h']
-    beta = params['beta']
+    beta = params['beta_s']
     sigma = params['sigma']
     g_y = params['g_y']
     E = params['E']
@@ -52,7 +52,7 @@ def compute_M_from_c(c_vec: np.ndarray, rho: np.ndarray, params: dict) -> np.nda
 
     M = np.zeros(S)
     # For s in [E, S-2]: include habit-correction term
-    M[E:S-1] = F[E:S-1] - h * beta * (1 - rho[E:S-1]) * np.exp(-sigma * g_y) * F[E+1:S]
+    M[E:S-1] = F[E:S-1] - h * beta[E:S-1] * (1 - rho[E:S-1]) * np.exp(-sigma * g_y) * F[E+1:S]
     # Boundary: no future contribution
     M[S-1] = F[S-1]
     return M
@@ -62,7 +62,7 @@ def compute_M_from_delta_c(delta_c, rho, params):
     """Same as compute_M_from_c but takes Δc directly, sidestepping
     the catastrophic cancellation when Δc is re-derived from a
     reconstructed c_vec."""
-    sigma, beta, g_y = params['sigma'], params['beta'], params['g_y']
+    sigma, beta, g_y = params['sigma'], params['beta_s'], params['g_y']
     h, E, S = params['h'], params['E'], params['S']
 
     if np.any(delta_c[E:] <= 0):
@@ -72,6 +72,6 @@ def compute_M_from_delta_c(delta_c, rho, params):
     F = np.zeros(S)
     F[E:] = delta_c[E:] ** (-sigma)
     M = np.zeros(S)
-    M[E:S-1] = F[E:S-1] - h*beta*(1-rho[E:S-1])*np.exp(-sigma*g_y)*F[E+1:S]
+    M[E:S-1] = F[E:S-1] - h*beta[E:S-1]*(1-rho[E:S-1])*np.exp(-sigma*g_y)*F[E+1:S]
     M[S-1] = F[S-1]
     return M

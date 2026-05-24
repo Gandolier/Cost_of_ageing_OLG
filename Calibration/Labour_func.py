@@ -69,6 +69,131 @@ def update_chi_from_foc(c_vec, w, tau_l, n_target, rho, params):
 
     return chi_s
 
+
+def update_beta_from_euler(c_target, r, rho, params):
+    """
+    Backward-recursion inverse of the habit Euler equation.
+
+    Computes the age-specific beta_s that reproduces the target
+    consumption profile c_target at interest rate r.
+
+    The recursion uses the identity
+
+        F_s = beta_s (1-rho_s) e^{-σ g_y} [ (1+r_net) M_{s+1} + h F_{s+1} ]
+
+    with terminal condition M_{S-1} = F_{S-1}.
+    """
+    from Individual_level.HabitUtility import compute_delta_c
+
+    sigma = params['sigma']
+    g_y = params['g_y']
+    h = params['h']
+    tau_k = params['tau_k']
+    E = params['E']
+    S = params['S']
+
+    r_net = r * (1 - tau_k)
+    edisc = np.exp(-sigma * g_y)
+
+    delta_c = compute_delta_c(c_target, params)
+
+    F = np.zeros(S)
+    F[E:] = np.maximum(delta_c[E:], 1e-12) ** (-sigma)
+
+    beta_s = np.full(S, 0.97)
+    M = np.zeros(S)
+
+    # terminal condition
+    M[S-1] = F[S-1]
+
+    for s in range(S-2, E-1, -1):
+        denom = (1 - rho[s]) * edisc * ((1 + r_net) * M[s+1] + h * F[s+1])
+        beta_s[s] = F[s] / denom
+        M[s] = beta_s[s] * (1 - rho[s]) * (1 + r_net) * edisc * M[s+1]
+
+    return beta_s
+
+
+def calibrate_chi_beta(params, vectors, n_target, c_target,
+                       max_iter=50, tol=1e-2, xi_chi=0.5, xi_beta=0.5,
+                       ss_solve_kwargs=None):
+    """
+    Dummy simultaneous calibration loop for chi_s and beta_s.
+
+    Each iteration:
+      1. Solve SS with current (chi_s, beta_s)
+      2. Update chi_s from labour FOC inverse
+      3. Update beta_s from Euler inverse using c_target
+      4. Damp updates until convergence
+    """
+
+    S = params['S']
+    E = params['E']
+
+    params = dict(params)
+
+    chi_s = params.get('chi_s', np.ones(S)).copy()
+    beta_s = params.get('beta_s', params.get('beta', 0.97) * np.ones(S)).copy()
+
+    params['chi_s'] = chi_s
+    params['beta_s'] = beta_s
+
+    result = None
+
+    for k in range(max_iter):
+
+        ss = SteadyStateEquilibrium(params, vectors)
+        result = ss.solve(**(ss_solve_kwargs or {}))
+
+        if result is None:
+            raise RuntimeError(f"calib iter {k}: SS failed")
+
+        r = result['r']
+        w = result['w']
+
+        chi_s_new = update_chi_from_foc(
+            c_vec=result['c_vec'],
+            w=w,
+            tau_l=result['tau_l'],
+            n_target=n_target,
+            rho=vectors['rho'],
+            params=params
+        )
+
+        beta_s_new = update_beta_from_euler(
+            c_target=c_target,
+            r=r,
+            rho=vectors['rho'],
+            params=params
+        )
+
+        err_chi = np.max(np.abs(chi_s_new[E:] - chi_s[E:]) /
+                         np.maximum(np.abs(chi_s[E:]), 1.0))
+
+        err_beta = np.max(np.abs(beta_s_new[E:] - beta_s[E:]) /
+                          np.maximum(np.abs(beta_s[E:]), 1e-3))
+
+        print(f"Outer iter {k}: dchi={err_chi:.3e}, dbeta={err_beta:.3e}, r={r:.4f}, w={w:.4f}")
+        print(25*"---")
+
+        if max(err_chi, err_beta) < tol:
+            params['chi_s'] = chi_s_new
+            params['beta_s'] = beta_s_new
+            return chi_s_new, beta_s_new, result
+
+        chi_s = xi_chi * chi_s_new + (1 - xi_chi) * chi_s
+        beta_s = xi_beta * beta_s_new + (1 - xi_beta) * beta_s
+
+        params['chi_s'] = chi_s
+        params['beta_s'] = beta_s
+
+        if ss_solve_kwargs is not None:
+            ss_solve_kwargs['r_guess'] = r
+            ss_solve_kwargs['BQ_guess'] = result['BQ']
+
+    return chi_s, beta_s, result
+
+
 def calibrate_chi(params, vectors, n_target,
                   max_iter=50, tol=1e-3, xi_chi=0.99,
                   ss_solve_kwargs=None):
@@ -117,7 +242,7 @@ def calibrate_chi(params, vectors, n_target,
             params=params,
         )
         # Clamp disutility of labour sensitivity
-        chi_s_new = np.clip(chi_s_new, 1e-8, 1e12)
+        #chi_s_new = np.clip(chi_s_new, 1e-8, 1e12)
 
         # Step 4: convergence check on chi_s
         denom = np.maximum(np.abs(chi_s[params['E']:]), 1.0)
@@ -249,7 +374,7 @@ def build_target_labour_profile(
     return n_target
 
 
-def build_cons_profile(raw_mids=None, raw_vals=None):
+def build_cons_profile(raw_mids=None, raw_vals=None, S=100, E=20):
     from scipy.interpolate import PchipInterpolator
     """Interpolate via PCHIP after augmenting with sentinel anchors.
 
@@ -257,7 +382,7 @@ def build_cons_profile(raw_mids=None, raw_vals=None):
     right_tail_zero=False: anchor the right tail at the last observed
     value (suited to hours-conditional-on-employment).
     """
-    full_s = np.arange(100)
+    full_s = np.arange(S)
 
     if raw_mids is None:
         raw_mids = [17, 22, 27, 32, 37, 42, 47, 52, 57, 62, 67, 72, 77, 82, 85]
@@ -272,8 +397,8 @@ def build_cons_profile(raw_mids=None, raw_vals=None):
     mids.append(90)
     vals.append(raw_vals[-1])
 
-    print(np.asarray(mids, dtype=float), np.asarray(vals, dtype=float))
     interp = PchipInterpolator(np.asarray(mids, dtype=float),
                                 np.asarray(vals, dtype=float))
     out = interp(full_s)
+    out[:E] = 0.
     return np.maximum(out, 0.0)  # clamp tiny negative artefacts

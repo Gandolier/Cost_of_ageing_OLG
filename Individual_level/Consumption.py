@@ -12,7 +12,7 @@ def get_consumption_path(c_start: float, r_vec: np.array, rho: np.array, p_param
     """
     S = p_params['S']           # max age of a household
     E = p_params['E']           # entry age (index E corresponds to age E+1)
-    beta = p_params['beta']     # subjective discount factor
+    beta = p_params['beta_s']     # age-specific subjective discount factor
     sigma = p_params['sigma']   # coefficient of relative risk aversion
     g_y = p_params['g_y']       # rate of labour augmenting technological growth
     rho = rho                   # mortality probability
@@ -43,7 +43,7 @@ def get_consumption_path(c_start: float, r_vec: np.array, rho: np.array, p_param
 
         # Effective discount factor including survival probability
         # beta * (1 - rho[s])
-        disc_surv = beta * (1 - rho[s])
+        disc_surv = beta[s] * (1 - rho[s])
 
         # Calculate next period consumption
         # c_{s+1} = c_s * (beta * (1-rho) * (1+r_net))^(1/sigma) * e^(-g_y)

@@ -369,7 +369,7 @@ class SteadyStateEquilibrium:
         c_vec = ss_dict['c_vec']
         r = ss_dict['r']
         sigma = self.params['sigma']
-        beta = self.params['beta']
+        beta = self.params['beta_s']
         g_y = self.params['g_y']
         tau_k = self.gov.tau_k
         E, S = self.params['E'], self.params['S']
@@ -378,7 +378,7 @@ class SteadyStateEquilibrium:
         r_net = r * (1 - tau_k)
 
         lhs = M_vec[E:S-1]
-        rhs = beta * (1 - self.rho[E:S-1]) * (1 + r_net) * np.exp(-sigma * g_y) * M_vec[E+1:S]
+        rhs = beta[E:S-1] * (1 - self.rho[E:S-1]) * (1 + r_net) * np.exp(-sigma * g_y) * M_vec[E+1:S]
         euler_errs = lhs - rhs
 
         max_err = np.max(np.abs(euler_errs))
