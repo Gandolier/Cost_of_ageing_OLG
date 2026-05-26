@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.optimize as opt
+
 from scipy.interpolate import PchipInterpolator
 
 from Steady_state_equilibrium.SS_Solver import SteadyStateEquilibrium
@@ -114,6 +115,93 @@ def update_beta_from_euler(c_target, r, rho, params):
     return beta_s
 
 
+def calibrate_chi_beta_nested(params, vectors, n_target, c_target,
+                              n_cycles=25, chi_per_beta=5,
+                              xi_chi=0.7, xi_beta=0.15,
+                              chi_tol=1e-3, beta_tol=5e-3,
+                              ky_max=6.0, r_floor=0.0,
+                              ss_solve_kwargs=None, verbose=True):
+    """
+    Block Gauss-Seidel with timescale separation (your design):
+      one cycle = [chi_per_beta fast chi updates at fixed beta] then [one slow beta step].
+    chi is well-conditioned given (beta, r, w) -> big step (xi_chi).
+    beta couples to the cleared r -> small step (xi_beta) so it can't chase r swings.
+    the SS solver clears r internally each solve. beta is updated
+    toward that CLEARED r, which is the only self-consistent thing to do.
+    A basin guard rejects glut solutions (K/Y>ky_max or r<r_floor) and retries from a
+    sane high-r/low-K start, so slow outer drift can't silently tip into the capital glut.
+    """
+    S, E = params['S'], params['E']
+    rho = vectors['rho']
+    params = dict(params)
+    chi_s  = params.get('chi_s',  np.ones(S)).copy()
+    beta_s = params.get('beta_s', params.get('beta', 0.97)*np.ones(S)).copy()
+    params['chi_s'], params['beta_s'] = chi_s, beta_s
+    kw = dict(ss_solve_kwargs or {})
+    last = {'dchi': np.nan, 'dbeta': np.nan, 'result': None}
+
+    def solve_ss(tag=""):
+        res = SteadyStateEquilibrium(params, vectors).solve(**kw)
+        if res is None:
+            raise RuntimeError(f"{tag}: SS failed")
+        ky = res['K'] / res['Y']
+        if ky > ky_max or res['r'] < r_floor:                 # basin guard
+            kw_sane = dict(kw, r_guess=max(0.1, r_floor+0.02), BQ_guess=0.1)
+            res2 = SteadyStateEquilibrium(params, vectors).solve(**kw_sane)
+            if res2 is not None and (res2['K']/res2['Y'] <= ky_max) and (res2['r'] >= r_floor):
+                res = res2
+            elif verbose:
+                print(f"    [guard] could not escape glut (K/Y={ky:.1f}); "
+                      f"beta_s has likely drifted too far -- lower xi_beta")
+        kw['r_guess'], kw['BQ_guess'] = res['r'], res['BQ']    # warm-start (keeps basin)
+        last['result'] = res
+        return res
+
+    xi_beta_fix = xi_beta
+    for c in range(n_cycles):
+        # ---- fast chi block (beta fixed) ----
+        dchi = np.nan
+
+        for j in range(chi_per_beta):
+            res = solve_ss(tag=f"cyc{c} chi{j}")
+            chi_new = update_chi_from_foc(res['c_vec'], res['w'], res['tau_l'],
+                                          n_target, rho, params)
+            dchi = np.max(np.abs(chi_new[E:] - chi_s[E:]) / np.maximum(np.abs(chi_s[E:]), 1.0))
+            chi_s = xi_chi * chi_new + (1 - xi_chi) * chi_s
+            params['chi_s'] = chi_s
+            if dchi < chi_tol:
+                break
+
+        # ---- one slow beta step (uses the CLEARED r, not an assumed one) ----
+        res = solve_ss(tag=f"cyc{c} beta")
+        xi_beta = xi_beta_fix if (res['K']/res['Y'] < ky_max) else min(0.6, xi_beta*2.5)
+        
+        beta_new = update_beta_from_euler(c_target, res['r'], rho, params)
+        beta_new[S-1] = beta_new[S-2]
+        dbeta = np.max(np.abs(beta_new[E:] - beta_s[E:]) / np.maximum(np.abs(beta_s[E:]), 1e-3))
+        beta_s = xi_beta * beta_new + (1 - xi_beta) * beta_s
+        params['beta_s'] = beta_s
+        last['dchi'], last['dbeta'] = dchi, dbeta
+
+        kw['r_guess'] = res['r']
+        kw['BQ_guess'] = res['BQ']
+
+        if verbose:
+            c_tz = (c_target[E:]-c_target[E:].mean())/c_target[E:].std()
+            v_tz = (res['c_vec'][E:]-res['c_vec'][E:].mean())/res['c_vec'][E:].std()
+            print(35*"---")
+            print(f"cycle {c:2d}: dchi={dchi:.2e} dbeta={dbeta:.2e} | "
+                  f"r={res['r']:+.4f} K/Y={res['K']/res['Y']:.2f} bS={res['b_vec'][-1]:+.3f} | "
+                  f"max|dn|={np.max(np.abs(res['n_vec']-n_target)):.4f} "
+                  f"max|dc_z|={np.max(np.abs(v_tz-c_tz)):.4f}")
+            print(35*"---")
+
+        if dchi < chi_tol and dbeta < beta_tol:
+            break
+
+    return chi_s, beta_s, last['result']
+
+
 def calibrate_chi_beta(params, vectors, n_target, c_target,
                        max_iter=50, tol=1e-2, xi_chi=0.5, xi_beta=0.5,
                        ss_solve_kwargs=None):
@@ -174,6 +262,11 @@ def calibrate_chi_beta(params, vectors, n_target, c_target,
                           np.maximum(np.abs(beta_s[E:]), 1e-3))
 
         print(f"Outer iter {k}: dchi={err_chi:.3e}, dbeta={err_beta:.3e}, r={r:.4f}, w={w:.4f}")
+        
+        c_trgt_print = (c_target - np.mean(c_target)) / np.std(c_target)
+        c_vec_print = (result['c_vec'] - np.mean(result['c_vec'])) / np.std(result['c_vec'])
+        print(f"max|n_vec - n_target| = {max(abs(result['n_vec']-n_target)):.4f}, "
+              f"max|c_vec - c_target| = {max(abs(c_vec_print-c_trgt_print)):.4f}")
         print(25*"---")
 
         if max(err_chi, err_beta) < tol:
