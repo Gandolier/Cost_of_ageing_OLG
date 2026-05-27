@@ -157,7 +157,6 @@ def calibrate_chi_beta_nested(params, vectors, n_target, c_target,
         last['result'] = res
         return res
 
-    xi_beta_fix = xi_beta
     for c in range(n_cycles):
         # ---- fast chi block (beta fixed) ----
         dchi = np.nan
@@ -174,7 +173,6 @@ def calibrate_chi_beta_nested(params, vectors, n_target, c_target,
 
         # ---- one slow beta step (uses the CLEARED r, not an assumed one) ----
         res = solve_ss(tag=f"cyc{c} beta")
-        xi_beta = xi_beta_fix if (res['K']/res['Y'] < ky_max) else min(0.6, xi_beta*2.5)
         
         beta_new = update_beta_from_euler(c_target, res['r'], rho, params)
         beta_new[S-1] = beta_new[S-2]
@@ -467,7 +465,7 @@ def build_target_labour_profile(
     return n_target
 
 
-def build_cons_profile(raw_mids=None, raw_vals=None, S=100, E=20):
+def build_cons_profile(raw_mids=None, raw_vals=None, S=100, E=20, g_y=0.):
     from scipy.interpolate import PchipInterpolator
     """Interpolate via PCHIP after augmenting with sentinel anchors.
 
@@ -492,6 +490,6 @@ def build_cons_profile(raw_mids=None, raw_vals=None, S=100, E=20):
 
     interp = PchipInterpolator(np.asarray(mids, dtype=float),
                                 np.asarray(vals, dtype=float))
-    out = interp(full_s)
+    out = interp(full_s) * np.exp(g_y * (np.arange(1, S+1, 1) - E))
     out[:E] = 0.
     return np.maximum(out, 0.0)  # clamp tiny negative artefacts
